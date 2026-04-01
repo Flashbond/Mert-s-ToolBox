@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2021",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "jsx": "react-jsx",
+    "strict": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "baseUrl": "ui-src",
+    "typeRoots": [ "./types", "./node_modules/@types" ],
+    "lib": [ "ES2021", "DOM" ]
+  },
+  "include": [ "ui-src", "types" ]
+}

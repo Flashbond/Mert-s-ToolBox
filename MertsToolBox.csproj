@@ -1,0 +1,154 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<Configurations>Debug;Release</Configurations>
+
+		<!--The file where mod information which is required for publishing mod on PDX mods are stored-->
+		<PublishConfigurationPath>Properties\PublishConfiguration.xml</PublishConfigurationPath>
+		<PackageIcon>icon.png</PackageIcon>
+		<AssemblyVersion>2.0.0</AssemblyVersion>
+		<FileVersion>2.0.0</FileVersion>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+		<IsPublishable>False</IsPublishable>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+		<IsPublishable>True</IsPublishable>
+	</PropertyGroup>
+	<ItemGroup>
+		<UpToDateCheckInput Include="**\*.tsx" />
+		<UpToDateCheckInput Include="**\*.scss" />
+	</ItemGroup>
+	<!--Imports must be after PropertyGroup block-->
+	<Import Project="$([System.Environment]::GetEnvironmentVariable('CSII_TOOLPATH', 'EnvironmentVariableTarget.User'))\Mod.props" />
+	<Import Project="$([System.Environment]::GetEnvironmentVariable('CSII_TOOLPATH', 'EnvironmentVariableTarget.User'))\Mod.targets" />
+	<ItemGroup>
+	  <None Remove="BounceCatcher.cs.txt" />
+	</ItemGroup>
+	<ItemGroup>
+	  <Compile Include="ModRuntime.cs.txt" />
+	</ItemGroup>
+	
+
+	<ItemGroup>
+		<Reference Include="0Harmony">
+			<HintPath>..\..\AppData\LocalLow\Colossal Order\Cities Skylines II\Mods\Mert's Perfect Circle\0Harmony.dll</HintPath>
+		</Reference>
+		<Reference Include="Colossal.Collections">
+		  <HintPath>D:\Cities Skylines II\Cities2_Data\Managed\Colossal.Collections.dll</HintPath>
+		  <Private>False</Private>
+		</Reference>
+		<Reference Include="Colossal.Mathematics">
+			<HintPath>D:\Cities Skylines II\Cities2_Data\Managed\Colossal.Mathematics.dll</HintPath>
+			<Private>False</Private>
+		</Reference>
+		<Reference Include="Game">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Colossal.Core">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Colossal.Logging">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Colossal.IO.AssetDatabase">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Colossal.UI">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Colossal.UI.Binding">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Colossal.Localization">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Unity.InputSystem">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="UnityEngine.CoreModule">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Unity.Burst">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Unity.Collections">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Unity.Entities">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Unity.Mathematics">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="UnityEngine.PhysicsModule">
+			<HintPath>D:\Cities Skylines II\Cities2_Data\Managed\UnityEngine.PhysicsModule.dll</HintPath>
+			<Private>False</Private>
+		</Reference>
+	</ItemGroup>
+
+	<ItemGroup>
+		<Reference Update="System">
+			<Private>false</Private>
+		</Reference>
+		<Reference Update="System.Core">
+			<Private>false</Private>
+		</Reference>
+		<Reference Update="System.Data">
+			<Private>false</Private>
+		</Reference>
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="$(ModPropsFile)" Link="Properties\Mod.props" />
+		<None Include="$(ModTargetsFile)" Link="Properties\Mod.targets" />
+		<None Include="..\..\Documents\MertsPerfectCircle\icon.png">
+		  <Pack>True</Pack>
+		  <PackagePath>\</PackagePath>
+		</None>
+	</ItemGroup>
+
+	<ItemGroup>
+		<Compile Update="Properties\Settings.Designer.cs">
+			<DesignTimeSharedInput>True</DesignTimeSharedInput>
+			<AutoGen>True</AutoGen>
+			<DependentUpon>Settings.settings</DependentUpon>
+		</Compile>
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Update="Properties\Settings.settings">
+			<Generator>SettingsSingleFileGenerator</Generator>
+			<LastGenOutput>Settings.Designer.cs</LastGenOutput>
+		</None>
+	</ItemGroup>
+
+	<!-- 1) Build frontend before C# build -->
+	<Target Name="BuildFrontendForDeploy" AfterTargets="RunModPostProcessor" BeforeTargets="DeployWIP">
+		<Message Text="Running frontend build (npm run build)..." Importance="high" />
+		<Exec Command="npm run build" WorkingDirectory="$(MSBuildProjectDirectory)" />
+	</Target>
+
+	<!-- 2) Copy frontend root files (.mjs / .css) from ui-dist to OutDir -->
+	<Target Name="CopyFrontendRootToOutDir" BeforeTargets="DeployWIP" Condition="Exists('ui-dist')">
+		<ItemGroup>
+			<FrontendRootFiles Include="ui-dist\*.mjs" />
+			<FrontendRootFiles Include="ui-dist\*.css" />
+		</ItemGroup>
+
+		<Message Text="Copying frontend root files to $(OutDir)" Importance="high" />
+		<Copy SourceFiles="@(FrontendRootFiles)" DestinationFiles="@(FrontendRootFiles->'$(OutDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+	</Target>
+
+	<!-- 3) Copy generated images folder (svg/png/etc) from ui-dist to OutDir -->
+	<Target Name="CopyFrontendImagesToOutDir" BeforeTargets="DeployWIP" Condition="Exists('ui-dist\icons')">
+		<ItemGroup>
+			<FrontendImages Include="ui-dist\icons\**\*.*" />
+		</ItemGroup>
+		<Message Text="Copying frontend icons to $(OutDir)\icons" Importance="high" />
+		<Copy SourceFiles="@(FrontendImages)" DestinationFiles="@(FrontendImages->'$(OutDir)icons\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+	</Target>
+
+</Project>

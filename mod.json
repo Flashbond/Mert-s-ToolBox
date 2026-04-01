@@ -1,0 +1,9 @@
+{
+  "name": "Mert's ToolBox",
+  "id": "MertsToolBox",
+  "version": "2.0.0",
+  "description": "Everything you need.",
+  "author": "Mert",
+  "game": "cs2",
+  "dependencies": []
+}

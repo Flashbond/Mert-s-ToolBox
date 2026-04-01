@@ -1,0 +1,49 @@
+﻿.circlePanel {
+    --size: calc(28rem * ((var(--fontScale) - 1) / 2 + 1));
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    padding-top: 4rem;
+    padding-left: 12rem;
+    padding-right: 12rem;
+    padding-bottom: 4rem;
+}
+.panelRow {
+    --size: calc(28rem * ((var(--fontScale) - 1) / 2 + 1));
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    padding-top: 4rem;
+    padding-left: 12rem;
+    padding-right: 12rem;
+    padding-bottom: 4rem;
+}
+.panelHeader {
+    font-size: 16rem;
+    font-weight: 700;
+}
+
+.rowLabel {
+    flex-grow: 0;
+    flex-shrink: 1;
+    flex-basis: auto;
+    margin-right: 10rem;
+    font-size: var(--fontSizeM);
+    font-weight: bold;
+    white-space: normal;
+    line-height: 130%;
+}
+
+.rowContent {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    flex-grow: 1;
+    flex-shrink: 1;
+    flex-basis: auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    margin-left: var(--gap3);
+}

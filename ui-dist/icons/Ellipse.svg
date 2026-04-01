@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" fill-rule="evenodd" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="superEllipseGrad" x1="30%" x2="75%" y1="30%" y2="75%" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6b6b6b" stop-opacity="1" />
+      <stop offset="1" stop-color="#cbcbcb" stop-opacity="1" />
+    </linearGradient>
+  </defs>
+  <path d="M26.7,10.4c3-2.5,7.8-2.5,10.7,0l20,17c3,2.5,3,6.6,0,9.2l-20,17c-3,2.5-7.8,2.5-10.7,0l-20-17 c-3-2.5-3-6.6,0-9.2L26.7,10.4z M37.5,23.2c-3-2.5-7.8-2.5-10.7,0l-5,4.2c-3,2.5-3,6.6,0,9.2l5,4.2c3,2.5,7.8,2.5,10.7,0l5-4.2 c3-2.5,3-6.6,0-9.2L37.5,23.2z" fill="url(#superEllipseGrad)" stroke="#707070" stroke-width="3.06"/>
+</svg>
