@@ -275,9 +275,18 @@ const register: ModRegistrar = (moduleRegistry) => {
                 : (props.children !== undefined && props.children !== null ? [props.children] : []);
 
             const safeProps = { ...props, children: mutableChildren };
-            const childrenStr = JSON.stringify(safeProps.children ?? "");
-            const isTopographySection = childrenStr.includes("ContourLines");
+            function isTopographyByChildren(children: any): boolean {
+                try {
+                    const str = JSON.stringify(children ?? "");
+                    return str.includes("ContourLines");
+                } catch {
+                    return false;
+                }
+            }
 
+            const isTopographySection = isTopographyByChildren(safeProps.children);
+
+           
             if (!isAllowed) return <OriginalSection {...safeProps} />;
 
             // Purge vanilla tool options from the DOM when a custom tool is active
