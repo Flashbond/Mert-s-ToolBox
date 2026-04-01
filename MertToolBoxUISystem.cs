@@ -35,7 +35,7 @@ namespace MertsToolBox
         private ValueBinding<bool> m_IsSnapGeometryActiveBinding;
         private ValueBinding<bool> m_IsSnapNetSideActiveBinding;
         private ValueBinding<bool> m_IsSnapNetAreaActiveBinding;
-        private ValueBinding<bool> m_IsSubtractActiveBinding;
+        private ValueBinding<bool> m_IsSubstractActiveBinding;
 
         #endregion
 
@@ -117,7 +117,7 @@ namespace MertsToolBox
             UpdateSuperEllipseBindings();
             UpdateGridBindings();
             UpdateSharedSnapBindings();
-            UpdateSharedSubtractBinding();
+            UpdateSharedSubstractBinding();
             UpdateActionHintBindings();
         }
 
@@ -179,7 +179,7 @@ namespace MertsToolBox
             AddBinding(m_IsSnapGeometryActiveBinding = new ValueBinding<bool>(ModId, "IsSnapGeometryActive", false));
             AddBinding(m_IsSnapNetSideActiveBinding = new ValueBinding<bool>(ModId, "IsSnapNetSideActive", false));
             AddBinding(m_IsSnapNetAreaActiveBinding = new ValueBinding<bool>(ModId, "IsSnapNetAreaActive", false));
-            AddBinding(m_IsSubtractActiveBinding = new ValueBinding<bool>(ModId, "IsSubtractActive", false));
+            AddBinding(m_IsSubstractActiveBinding = new ValueBinding<bool>(ModId, "IsSubstractActive", false));
 
             // Action Hints
             AddBinding(m_ShowCircleCtrlWheelHintBinding = new ValueBinding<bool>(ModId, "ShowCircleCtrlWheelHint", false));
@@ -208,7 +208,7 @@ namespace MertsToolBox
             AddBinding(new TriggerBinding(ModId, "CircleDiameterDown", () => m_CircleTool?.QueueDiameterChange(-1)));
             AddBinding(new TriggerBinding(ModId, "CircleDiameterStep", () => m_CircleTool?.QueueDiameterStepCycle()));
             AddBinding(new TriggerBinding<string>(ModId, "ToggleCircleSnap", (snapType) => m_CircleTool?.QueueSnapToggle(snapType)));
-            AddBinding(new TriggerBinding(ModId, "ToggleCircleSubtract", () => m_CircleTool?.QueueSubtractToggle()));
+            AddBinding(new TriggerBinding(ModId, "ToggleCircleSubstract", () => m_CircleTool?.QueueSubstractToggle()));
 
             // Helix Triggers
             AddBinding(new TriggerBinding(ModId, "HelixDiameterUp", () => m_HelixTool?.QueueDiameterChange(+1)));
@@ -231,7 +231,7 @@ namespace MertsToolBox
             AddBinding(new TriggerBinding(ModId, "SuperEllipseLengthStep", () => m_SuperEllipseTool?.QueueLengthStepCycle()));
             AddBinding(new TriggerBinding<float>(ModId, "SuperEllipseSetN", (value) => m_SuperEllipseTool?.SetNFromUi(value)));
             AddBinding(new TriggerBinding<string>(ModId, "SuperEllipseToggleSnap", (snapType) => m_SuperEllipseTool?.QueueSnapToggle(snapType)));
-            AddBinding(new TriggerBinding(ModId, "ToggleEllipseSubtract", () => m_SuperEllipseTool?.QueueSubtractToggle()));
+            AddBinding(new TriggerBinding(ModId, "ToggleEllipseSubstract", () => m_SuperEllipseTool?.QueueSubstractToggle()));
 
             // Grid Triggers
             AddBinding(new TriggerBinding(ModId, "GridBlockWidthUp", () => m_GridTool?.QueueBlockWidthChange(+1)));
@@ -496,16 +496,16 @@ namespace MertsToolBox
         #endregion
 
         #region 9. HELPERS
-        private void UpdateSharedSubtractBinding()
+        private void UpdateSharedSubstractBinding()
         {
-            bool isSubtractActive = false;
+            bool isSubstractActive = false;
 
             if (m_CircleTool != null && m_CircleTool.ToolEnabled)
-                isSubtractActive = m_CircleTool.IsSubtractEnabled();
+                isSubstractActive = m_CircleTool.IsSubstractEnabled();
             else if (m_SuperEllipseTool != null && m_SuperEllipseTool.ToolEnabled)
-                isSubtractActive = m_SuperEllipseTool.IsSubtractEnabled();
+                isSubstractActive = m_SuperEllipseTool.IsSubstractEnabled();
 
-            m_IsSubtractActiveBinding.Update(isSubtractActive);
+            m_IsSubstractActiveBinding.Update(isSubstractActive);
         }
         private static string FormatSmart(float value)
         {

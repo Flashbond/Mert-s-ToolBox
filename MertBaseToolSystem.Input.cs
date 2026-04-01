@@ -113,8 +113,6 @@ namespace MertsToolBox
 
                 m_PendingDisableAfterPlacement = true;
                 m_PostPlaceDisableAt = RealtimeNow + 0.01;
-
-                OnShapePlaced();
             }
 
             if (m_PendingDisableAfterPlacement && RealtimeNow >= m_PostPlaceDisableAt)
@@ -130,7 +128,11 @@ namespace MertsToolBox
 
             return false;
         }
-
+        protected void ArmDisableAfterSuccessfulPlacement(double delay = 0.01)
+        {
+            m_PendingDisableAfterPlacement = true;
+            m_PostPlaceDisableAt = RealtimeNow + delay;
+        }
         #endregion
     }
 }
