@@ -48,7 +48,6 @@ export const GridPanelSection = ({
         endButtonClass: string;
         numberFieldClass: string;
         indicatorClass: string;
-        isReady: boolean;
     };
 }) => {
 

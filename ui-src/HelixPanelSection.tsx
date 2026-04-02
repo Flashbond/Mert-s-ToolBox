@@ -37,7 +37,6 @@ export const HelixPanelSection = ({
         endButtonClass: string;
         numberFieldClass: string;
         indicatorClass: string;
-        isReady: boolean;
     };
 }) => {
 

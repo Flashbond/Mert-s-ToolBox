@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useState } from "react";
 import { bindValue, trigger, useValue } from "cs2/api";
 import styles from "./ToolBoxPanel.module.scss";
-import subtractIcon from "./Icons/Subtract.svg";
+import substractIcon from "./Icons/Subtract.svg";
 import { formatMeters, formatSmart } from "./Formatters";
 // --- GLOBAL BINDINGS (C# TO UI) ---
 
@@ -16,7 +16,7 @@ const isSnapGeometryActive$ = bindValue<boolean>("MertsToolBox", "IsSnapGeometry
 const isSnapNetSideActive$ = bindValue<boolean>("MertsToolBox", "IsSnapNetSideActive");
 const isSnapNetAreaActive$ = bindValue<boolean>("MertsToolBox", "IsSnapNetAreaActive");
 
-const isSubtractActive$ = bindValue<boolean>("MertsToolBox", "IsSubtractActive");
+const isSubstractActive$ = bindValue<boolean>("MertsToolBox", "IsSubstractActive");
 
 // --- HELPER FUNCTIONS ---
 
@@ -39,7 +39,6 @@ export const CirclePanelSection = ({
         endButtonClass: string;
         numberFieldClass: string;
         indicatorClass: string;
-        isReady: boolean;
     };
 }) => {
     // --- VISIBILITY & LIFECYCLE ---
@@ -76,7 +75,7 @@ export const CirclePanelSection = ({
     const isSnapNetSideActive = useValue(isSnapNetSideActive$);
     const isSnapNetAreaActive = useValue(isSnapNetAreaActive$);
 
-    const isSubtractActive = useValue(isSubtractActive$);
+    const isSubstractActive = useValue(isSubstractActive$);
     
     const {
         buttonClass,
@@ -200,21 +199,21 @@ export const CirclePanelSection = ({
                 </div>
             </div>
 
-            {/* SUBTRACT ROW */}
+            {/* SUBSTRACT ROW */}
             <div className={styles.panelRow}>
-                <div className={styles.rowLabel}>Subtract (Experimental)</div>
+                <div className={styles.rowLabel}>Substract (Experimental)</div>
                 <div className={styles.rowContent}>
                     <button
-                        className={`${buttonClass} ${iconButtonClass} ${isSubtractActive ? "selected" : ""}`}
+                        className={`${buttonClass} ${iconButtonClass} ${isSubstractActive ? "selected" : ""}`}
                         onMouseDown={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
                             uiPing();
-                            trigger("MertsToolBox", "ToggleCircleSubtract");
+                            trigger("MertsToolBox", "ToggleCircleSubstract");
                         }}
                     >
-                        <img src={subtractIcon} className={iconClass} alt="Subtract" />
+                        <img src={substractIcon} className={iconClass} alt="Substract" />
                     </button>
                 </div>
             </div>
