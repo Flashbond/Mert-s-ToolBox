@@ -5,7 +5,7 @@ using Game.Settings;
 
 namespace MertsToolBox
 {
-    [FileLocation(nameof(Settings))]
+    [FileLocation("ModsSettings/MertsToolBox/MertsToolBox")]
     [SettingsUITabOrder(
         TAB_CIRCLE,
         TAB_HELIX,
@@ -274,7 +274,6 @@ namespace MertsToolBox
         public override void Apply()
         {
             base.Apply();
-            _ = AssetDatabase.global.SaveSettings();
         }
     }
 }

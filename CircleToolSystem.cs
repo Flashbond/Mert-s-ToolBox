@@ -12,7 +12,7 @@ namespace MertsToolBox
         private int m_CurrentSessionDiameter = -1;
         private readonly int[] m_DiameterSteps = new int[] { 2, 4, 6, 8 };
         private int m_CurrentDiameterStepIndex = 3;
-        private bool m_IsSubtractEnabled = false;
+        private bool m_IsSubstractEnabled = false;
         #endregion
 
         #region 2. PENDING ACTIONS (MAILBOX)
@@ -20,7 +20,7 @@ namespace MertsToolBox
         private int m_PendingDiameterChange = 0;
         private bool m_PendingDiameterStepCycle = false;
         private string m_PendingSnapToggle = null;
-        private bool m_PendingSubtractToggle = false;
+        private bool m_PendingSubstractToggle = false;
 
         #endregion
 
@@ -41,14 +41,14 @@ namespace MertsToolBox
         #region 4. UI EVENT QUEUES (MAILBOX)
 
         /// <summary>
-        /// Queues a toggle action for the subtract mode.
+        /// Queues a toggle action for the substract mode.
         /// </summary>
-        public void QueueSubtractToggle() => m_PendingSubtractToggle = true;
+        public void QueueSubstractToggle() => m_PendingSubstractToggle = true;
 
         /// <summary>
-        /// Checks if the subtract mode is currently enabled. Used for UI binding.
+        /// Checks if the substract mode is currently enabled. Used for UI binding.
         /// </summary>
-        public bool IsSubtractEnabled() => m_IsSubtractEnabled;
+        public bool IsSubstractEnabled() => m_IsSubstractEnabled;
 
         /// <summary>
         /// Queues a toggle action for a specific snap type.
@@ -120,10 +120,10 @@ namespace MertsToolBox
                 m_PendingDiameterStepCycle = false;
             }
 
-            if (m_PendingSubtractToggle)
+            if (m_PendingSubstractToggle)
             {
-                m_IsSubtractEnabled = !m_IsSubtractEnabled;
-                m_PendingSubtractToggle = false;
+                m_IsSubstractEnabled = !m_IsSubstractEnabled;
+                m_PendingSubstractToggle = false;
             }
 
             if (Mod.settings != null &&
@@ -288,14 +288,14 @@ namespace MertsToolBox
 
         #endregion
 
-        #region 9. SUBTRACT & PLACEMENT LOGIC
+        #region 9. SUBSTRACT & PLACEMENT LOGIC
 
         /// <summary>
-        /// Executes post-placement logic, including triggering the terrain subtract manager if enabled.
+        /// Executes post-placement logic, including triggering the terrain substract manager if enabled.
         /// </summary>
         protected override void OnShapePlaced()
         {
-            if (!m_IsSubtractEnabled) return;
+            if (!m_IsSubstractEnabled) return;
 
             if (!m_ToolRaycastSystem.GetRaycastResult(out var result))
                 return;
@@ -322,7 +322,7 @@ namespace MertsToolBox
             float rotation = 0f;
             float nValue = 2f;
 
-            SubtractManager.Request(hitPos, rotation, outerA, outerB, innerA, innerB, nValue);
+            SubstractManager.Request(hitPos, rotation, outerA, outerB, innerA, innerB, nValue);
         }
 
         #endregion
