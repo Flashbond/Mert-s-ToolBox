@@ -28,7 +28,7 @@
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/merts-perfect-circle-feedback-suggestions-bug-reports.1911521/" />
 
 	<!--Version of the mod-->
-	<ModVersion Value="2.0.0" />
+	<ModVersion Value="2.0.3" />
 
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.5.*" />
@@ -45,7 +45,7 @@
 	</ChangeLog>
 
 	<!--External links-->
-	<ExternalLink Type="github" Url="https://github.com/Flashbond/Mert-s-Perfect-Circle" />
+	<ExternalLink Type="github" Url="https://github.com/Flashbond/Mert-s-ToolBox" />
 	<!-- İstersen YouTube ekle -->
 
 	<!--Supported values Public, Private, Unlisted-->
