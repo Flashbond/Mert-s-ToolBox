@@ -3,7 +3,7 @@ import { bindValue, trigger, useValue } from "cs2/api";
 import styles from "./ToolBoxPanel.module.scss";
 import alternatingIcon from "./Icons/Alternating.svg";
 import orientationIcon from "./Icons/Orientation.svg";
-
+import { formatUnits, formatSmart } from "./Formatters";
 // --- GLOBAL BINDINGS (C# TO UI) ---
 
 const activeToolMode$ = bindValue<string>("MertsToolBox", "ActiveTool");
@@ -17,30 +17,22 @@ const gridRows$ = bindValue<number>("MertsToolBox", "GridRows");
 const gridAlternating$ = bindValue<boolean>("MertsToolBox", "GridAlternating");
 const gridOrientationLeftBottom$ = bindValue<boolean>("MertsToolBox", "GridOrientationLeftBottom");
 
+const showSnapRow$ = bindValue<boolean>("MertsToolBox", "ShowSnapRow", false);
 const isSnapGeometryActive$ = bindValue<boolean>("MertsToolBox", "IsSnapGeometryActive");
 const isSnapNetSideActive$ = bindValue<boolean>("MertsToolBox", "IsSnapNetSideActive");
 const isSnapNetAreaActive$ = bindValue<boolean>("MertsToolBox", "IsSnapNetAreaActive");
 
 const gridIsOneWaySupported$ = bindValue<boolean>("MertsToolBox", "GridIsOneWaySupported");
 
-// --- HELPER FUNCTIONS ---
-
-const uiPing = () => trigger("MertsToolBox", "UiInteracted");
-
-function formatUnits(value: number): string {
-    return `${value} U`;
-}
-
-function formatCount(value: number): string {
-    return `${value}`;
-}
-
 // --- COMPONENT DEFINITION ---
 
 export const GridPanelSection = ({
     vanillaClasses
 }: {
-    vanillaClasses: {
+        vanillaClasses: {
+        itemClass: string;
+        labelClass: string;
+        contentClass: string;
         buttonClass: string;
         iconClass: string;
         iconButtonClass: string;
@@ -87,12 +79,15 @@ export const GridPanelSection = ({
     const isOrientationLeftBottom = useValue(gridOrientationLeftBottom$) as boolean;
     const isOneWaySupported = useValue(gridIsOneWaySupported$) as boolean;
 
-    // Note: Snap bindings are initialized here in case you want to render a Snap row later.
+    const showSnapRow = useValue(showSnapRow$) as Boolean;
     const isSnapGeometryActive = useValue(isSnapGeometryActive$) as boolean;
     const isSnapNetSideActive = useValue(isSnapNetSideActive$) as boolean;
     const isSnapNetAreaActive = useValue(isSnapNetAreaActive$) as boolean;
-
+    
     const {
+        itemClass,
+        labelClass,
+        contentClass,
         buttonClass,
         iconClass,
         iconButtonClass,
@@ -107,23 +102,29 @@ export const GridPanelSection = ({
 
     return (
         <div
-            className={`grid-panel-container ${styles.circlePanel}`}
-            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); uiPing(); }}
+            className={`grid-panel-container`}
+            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
             onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
         >
-            <div className={styles.panelHeader}>Smart Grid</div>
+            <div className={'panel-header'} style={{
+                fontSize: "16rem",
+                fontWeight: 700,
+                paddingTop: "4rem",
+                paddingLeft: "12rem",
+                paddingRight: "12rem",
+                paddingBottom: "4rem"
+            }}>Smart Grid</div>
 
             {/* BLOCK WIDTH ROW */}
-            <div className={styles.panelRow}>
-                <div className={styles.rowLabel}>Block Width</div>
-                <div className={styles.rowContent}>
+            <div className={itemClass}>
+                <div className={labelClass}>Block Width</div>
+                <div className={contentClass}>
                     <button
                         className={`${buttonClass} ${iconButtonClass} ${startButtonClass}`}
                         onMouseDown={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "GridBlockWidthDown");
                         }}
                     >
@@ -138,7 +139,6 @@ export const GridPanelSection = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "GridBlockWidthUp");
                         }}
                     >
@@ -148,16 +148,15 @@ export const GridPanelSection = ({
             </div>
 
             {/* BLOCK DEPTH ROW */}
-            <div className={styles.panelRow}>
-                <div className={styles.rowLabel}>Block Depth</div>
-                <div className={styles.rowContent}>
+            <div className={itemClass}>
+                <div className={labelClass}>Block Depth</div>
+                <div className={contentClass}>
                     <button
                         className={`${buttonClass} ${iconButtonClass} ${startButtonClass}`}
                         onMouseDown={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "GridBlockLengthDown");
                         }}
                     >
@@ -172,7 +171,6 @@ export const GridPanelSection = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "GridBlockLengthUp");
                         }}
                     >
@@ -182,23 +180,22 @@ export const GridPanelSection = ({
             </div>
 
             {/* COLUMNS ROW */}
-            <div className={styles.panelRow}>
-                <div className={styles.rowLabel}>Columns</div>
-                <div className={styles.rowContent}>
+            <div className={itemClass}>
+                <div className={labelClass}>Columns</div>
+                <div className={contentClass}>
                     <button
                         className={`${buttonClass} ${iconButtonClass} ${startButtonClass}`}
                         onMouseDown={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "GridColumnsDown");
                         }}
                     >
                         <img className={iconClass} src="Media/Glyphs/ThickStrokeArrowDown.svg" alt="Down" />
                     </button>
 
-                    <div className={numberFieldClass}>{formatCount(columns)}</div>
+                    <div className={numberFieldClass}>{formatSmart(columns)}</div>
 
                     <button
                         className={`${buttonClass} ${iconButtonClass} ${endButtonClass}`}
@@ -206,7 +203,6 @@ export const GridPanelSection = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "GridColumnsUp");
                         }}
                     >
@@ -216,23 +212,22 @@ export const GridPanelSection = ({
             </div>
 
             {/* ROWS ROW */}
-            <div className={styles.panelRow}>
-                <div className={styles.rowLabel}>Rows</div>
-                <div className={styles.rowContent}>
+            <div className={itemClass}>
+                <div className={labelClass}>Rows</div>
+                <div className={contentClass}>
                     <button
                         className={`${buttonClass} ${iconButtonClass} ${startButtonClass}`}
                         onMouseDown={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "GridRowsDown");
                         }}
                     >
                         <img className={iconClass} src="Media/Glyphs/ThickStrokeArrowDown.svg" alt="Down" />
                     </button>
 
-                    <div className={numberFieldClass}>{formatCount(rows)}</div>
+                    <div className={numberFieldClass}>{formatSmart(rows)}</div>
 
                     <button
                         className={`${buttonClass} ${iconButtonClass} ${endButtonClass}`}
@@ -240,7 +235,6 @@ export const GridPanelSection = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "GridRowsUp");
                         }}
                     >
@@ -250,9 +244,9 @@ export const GridPanelSection = ({
             </div>
 
             {/* ONE-WAY PATTERN ROW */}
-            <div className={styles.panelRow}>
-                <div className={styles.rowLabel}>Pattern (One-Way Roads)</div>
-                <div className={styles.rowContent}>
+            <div className={itemClass}>
+                <div className={labelClass}>Pattern (One-Way Roads)</div>
+                <div className={contentClass}>
                     <button
                         className={`${buttonClass} ${iconButtonClass} ${isAlternating ? "selected" : ""}`}
                         disabled={!isOneWaySupported}
@@ -261,7 +255,6 @@ export const GridPanelSection = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0 || !isOneWaySupported) return;
-                            uiPing();
                             trigger("MertsToolBox", "GridToggleAlternating");
                         }}
                         title={isOneWaySupported ? "Alternating" : "Requires a one-way road"}
@@ -277,7 +270,6 @@ export const GridPanelSection = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0 || !isOneWaySupported) return;
-                            uiPing();
                             trigger("MertsToolBox", "GridToggleOrientation");
                         }}
                         title={isOneWaySupported ? "Orientation" : "Requires a one-way road"}
@@ -286,6 +278,48 @@ export const GridPanelSection = ({
                     </button>
                 </div>
             </div>
+            {showSnapRow && (
+                <div className={itemClass}>
+                <div className={labelClass}>Snap</div>
+                    <div className={contentClass}>
+                    <button
+                        className={`${buttonClass} ${iconButtonClass} ${isSnapGeometryActive ? "selected" : ""}`}
+                        onMouseDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (e.button !== 0) return;
+                            trigger("MertsToolBox", "GridToggleSnap", "Geometry");
+                        }}
+                    >
+                        <img src="Media/Tools/Snap Options/ExistingGeometry.svg" className={iconClass} alt="Geometry" />
+                    </button>
+
+                    <button
+                        className={`${buttonClass} ${iconButtonClass} ${isSnapNetSideActive ? "selected" : ""}`}
+                        onMouseDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (e.button !== 0) return;
+                            trigger("MertsToolBox", "GridToggleSnap", "NetSide");
+                        }}
+                    >
+                        <img src="Media/Tools/Snap Options/NetSide.svg" className={iconClass} alt="Road Side" />
+                    </button>
+
+                    <button
+                        className={`${buttonClass} ${iconButtonClass} ${isSnapNetAreaActive ? "selected" : ""}`}
+                        onMouseDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (e.button !== 0) return;
+                            trigger("MertsToolBox", "GridToggleSnap", "NetArea");
+                        }}
+                    >
+                        <img src="Media/Tools/Snap Options/NetArea.svg" className={iconClass} alt="Road Node" />
+                    </button>
+                </div>
+            </div>
+            )}
         </div>
     );
 };

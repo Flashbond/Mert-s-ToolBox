@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 
 export type VanillaClasses = {
+    itemClass: string;
+    labelClass: string;
+    contentClass: string;
     buttonClass: string;
     iconClass: string;
     iconButtonClass: string;
@@ -11,6 +14,9 @@ export type VanillaClasses = {
 };
 
 const fallbackClasses: VanillaClasses = {
+    itemClass: "item_bZY",
+    labelClass: "label_RZX",
+    contentClass: "content_ZIz",
     buttonClass: "button_yDV button_yDV",
     iconClass: "icon_okL",
     iconButtonClass: "icon-button_fSD",
@@ -34,6 +40,9 @@ function extractClass(element: Element | null, prefix: string): string {
 function readVanillaClasses(): VanillaClasses {
     const panel = document.querySelector('[class*="tool-options-panel_"]') || document;
 
+    const itemClass = extractClass(panel.querySelector('div[class*="item"]'), "item_");
+    const labelClass = extractClass(panel.querySelector('div[class*="label"]'), "label_");
+    const contentClass = extractClass(panel.querySelector('div[class*="content"]'), "content_");
     const buttonClass = extractClass(panel.querySelector('button[class*="button_"]'), "button_");
     const iconClass = extractClass(panel.querySelector('button img[class*="icon_"]'), "icon_");
     const iconButtonClass = extractClass(panel.querySelector('button[class*="icon-button_"]'), "icon-button_");
@@ -43,6 +52,9 @@ function readVanillaClasses(): VanillaClasses {
     const indicatorClass = extractClass(panel.querySelector('svg[class*="indicator_"]'), "indicator_");
 
     return {
+        itemClass: itemClass || fallbackClasses.itemClass,
+        labelClass: labelClass || fallbackClasses.labelClass,
+        contentClass: contentClass || fallbackClasses.contentClass,
         buttonClass: buttonClass ? `${buttonClass} ${buttonClass}` : fallbackClasses.buttonClass,
         iconClass: iconClass || fallbackClasses.iconClass,
         iconButtonClass: iconButtonClass || fallbackClasses.iconButtonClass,

@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useState } from "react";
 import { bindValue, trigger, useValue } from "cs2/api";
 import styles from "./ToolBoxPanel.module.scss";
-import substractIcon from "./Icons/Subtract.svg";
+import subtractIcon from "./Icons/Subtract.svg";
 import { formatMeters, formatSmart } from "./Formatters";
 // --- GLOBAL BINDINGS (C# TO UI) ---
 
@@ -16,22 +16,15 @@ const isSnapGeometryActive$ = bindValue<boolean>("MertsToolBox", "IsSnapGeometry
 const isSnapNetSideActive$ = bindValue<boolean>("MertsToolBox", "IsSnapNetSideActive");
 const isSnapNetAreaActive$ = bindValue<boolean>("MertsToolBox", "IsSnapNetAreaActive");
 
-const isSubstractActive$ = bindValue<boolean>("MertsToolBox", "IsSubstractActive");
-
-// --- HELPER FUNCTIONS ---
-
-const uiPing = () => trigger("MertsToolBox", "UiInteracted");
-
-
-
-
-
 // --- COMPONENT DEFINITION ---
 
 export const CirclePanelSection = ({
     vanillaClasses
 }: {
-    vanillaClasses: {
+        vanillaClasses: {
+        itemClass: string;
+        labelClass: string;
+        contentClass: string;
         buttonClass: string;
         iconClass: string;
         iconButtonClass: string;
@@ -75,9 +68,10 @@ export const CirclePanelSection = ({
     const isSnapNetSideActive = useValue(isSnapNetSideActive$);
     const isSnapNetAreaActive = useValue(isSnapNetAreaActive$);
 
-    const isSubstractActive = useValue(isSubstractActive$);
-    
     const {
+        itemClass,
+        labelClass,
+        contentClass,
         buttonClass,
         iconButtonClass,
         iconClass,
@@ -93,23 +87,29 @@ export const CirclePanelSection = ({
 
     return (
         <div
-            className={`circle-panel-container ${styles.circlePanel}`}
-            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); uiPing(); }}
+            className={`circle-panel-container`}
+            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
             onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
         >
-            <div className={styles.panelHeader}>Perfect Circle</div>
+            <div className={'panel-header'} style={{
+                fontSize: "16rem",
+                fontWeight: 700,
+                paddingTop: "4rem",
+                paddingLeft: "12rem",
+                paddingRight: "12rem",
+                paddingBottom: "4rem"
+            }}>Perfect Circle</div>
 
             {/* DIAMETER ROW */}
-            <div className={styles.panelRow}>
-                <div className={styles.rowLabel}>Diameter</div>
-                <div className={styles.rowContent}>
+            <div className={itemClass}>
+                <div className={labelClass}>Diameter</div>
+                <div className={contentClass}>
                     <button
                         className={`${buttonClass} ${iconButtonClass} ${startButtonClass}`}
                         onMouseDown={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "CircleDiameterDown");
                         }}
                     >
@@ -126,7 +126,6 @@ export const CirclePanelSection = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "CircleDiameterUp");
                         }}
                     >
@@ -139,7 +138,6 @@ export const CirclePanelSection = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "CircleDiameterStep");
                         }}
                         title={`Step ${diameterStepSize}`}
@@ -155,16 +153,15 @@ export const CirclePanelSection = ({
             </div>
 
             {/* SNAP ROW */}
-            <div className={styles.panelRow}>
-                <div className={styles.rowLabel}>Snap</div>
-                <div className={styles.rowContent}>
+            <div className={itemClass}>
+                <div className={labelClass}>Snap</div>
+                <div className={contentClass}>
                     <button
                         className={`${buttonClass} ${iconButtonClass} ${isSnapGeometryActive ? "selected" : ""}`}
                         onMouseDown={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "ToggleCircleSnap", "Geometry");
                         }}
                     >
@@ -177,11 +174,10 @@ export const CirclePanelSection = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "ToggleCircleSnap", "NetSide");
                         }}
                     >
-                        <img src="Media/Tools/Snap Options/NetSide.svg" className={iconClass} alt="Road Side" />
+                        <img src="Media/Tools/Snap Options/NetSide.svg" className={iconClass} alt="Side" />
                     </button>
 
                     <button
@@ -190,30 +186,10 @@ export const CirclePanelSection = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "ToggleCircleSnap", "NetArea");
                         }}
                     >
-                        <img src="Media/Tools/Snap Options/NetArea.svg" className={iconClass} alt="Road Node" />
-                    </button>
-                </div>
-            </div>
-
-            {/* SUBSTRACT ROW */}
-            <div className={styles.panelRow}>
-                <div className={styles.rowLabel}>Substract (Experimental)</div>
-                <div className={styles.rowContent}>
-                    <button
-                        className={`${buttonClass} ${iconButtonClass} ${isSubstractActive ? "selected" : ""}`}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0) return;
-                            uiPing();
-                            trigger("MertsToolBox", "ToggleCircleSubstract");
-                        }}
-                    >
-                        <img src={substractIcon} className={iconClass} alt="Substract" />
+                        <img src="Media/Tools/Snap Options/NetArea.svg" className={iconClass} alt="Area" />
                     </button>
                 </div>
             </div>

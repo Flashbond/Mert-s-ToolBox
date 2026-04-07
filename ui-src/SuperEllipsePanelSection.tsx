@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { bindValue, trigger, useValue } from "cs2/api";
 import styles from "./ToolBoxPanel.module.scss";
-import substractIcon from "./Icons/Subtract.svg";
+import subtractIcon from "./Icons/Subtract.svg";
 import { MertSlider } from "./MertSlider";
 import {formatMeters, formatSmart } from "./Formatters";
 // --- GLOBAL BINDINGS (C# TO UI) ---
@@ -21,18 +21,15 @@ const isSnapGeometryActive$ = bindValue<boolean>("MertsToolBox", "IsSnapGeometry
 const isSnapNetSideActive$ = bindValue<boolean>("MertsToolBox", "IsSnapNetSideActive");
 const isSnapNetAreaActive$ = bindValue<boolean>("MertsToolBox", "IsSnapNetAreaActive");
 
-const isSubstractActive$ = bindValue<boolean>("MertsToolBox", "IsSubstractActive");
-
-// --- HELPER FUNCTIONS ---
-
-const uiPing = () => trigger("MertsToolBox", "UiInteracted");
-
 // --- COMPONENT DEFINITION ---
 
 export const SuperEllipsePanelSection = ({
     vanillaClasses
 }: {
-    vanillaClasses: {
+        vanillaClasses: {
+        itemClass: string;
+        labelClass: string;
+        contentClass: string;
         buttonClass: string;
         iconClass: string;
         iconButtonClass: string;
@@ -82,9 +79,10 @@ export const SuperEllipsePanelSection = ({
     const isSnapNetSideActive = useValue(isSnapNetSideActive$) as boolean;
     const isSnapNetAreaActive = useValue(isSnapNetAreaActive$) as boolean;
 
-    const isSubstractActive = useValue(isSubstractActive$);
-
     const {
+        itemClass,
+        labelClass,
+        contentClass,
         buttonClass,
         iconClass,
         iconButtonClass,
@@ -100,23 +98,29 @@ export const SuperEllipsePanelSection = ({
 
     return (
         <div
-            className={`superellipse-panel-container ${styles.circlePanel}`}
-            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); uiPing(); }}
+            className={`superellipse-panel-container`}
+            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
             onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
         >
-            <div className={styles.panelHeader}>Super Ellipse</div>
+            <div className={'panel-header'} style={{
+                fontSize: "16rem",
+                fontWeight: 700,
+                paddingTop: "4rem",
+                paddingLeft: "12rem",
+                paddingRight: "12rem",
+                paddingBottom: "4rem"
+            }}>Super Ellipse</div>
 
             {/* WIDTH ROW */}
-            <div className={styles.panelRow}>
-                <div className={styles.rowLabel}>Width</div>
-                <div className={styles.rowContent}>
+            <div className={itemClass}>
+                <div className={labelClass}>Width</div>
+                <div className={contentClass}>
                     <button
                         className={`${buttonClass} ${iconButtonClass} ${startButtonClass}`}
                         onMouseDown={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "SuperEllipseWidthDown");
                         }}
                     >
@@ -131,7 +135,6 @@ export const SuperEllipsePanelSection = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "SuperEllipseWidthUp");
                         }}
                     >
@@ -144,7 +147,6 @@ export const SuperEllipsePanelSection = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "SuperEllipseWidthStep");
                         }}
                         title={`Step Index: ${widthStepIndex}`}
@@ -160,16 +162,15 @@ export const SuperEllipsePanelSection = ({
             </div>
 
             {/* LENGTH ROW */}
-            <div className={styles.panelRow}>
-                <div className={styles.rowLabel}>Length</div>
-                <div className={styles.rowContent}>
+            <div className={itemClass}>
+                <div className={labelClass}>Length</div>
+                <div className={contentClass}>
                     <button
                         className={`${buttonClass} ${iconButtonClass} ${startButtonClass}`}
                         onMouseDown={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "SuperEllipseLengthDown");
                         }}
                     >
@@ -184,7 +185,6 @@ export const SuperEllipsePanelSection = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "SuperEllipseLengthUp");
                         }}
                     >
@@ -197,7 +197,6 @@ export const SuperEllipsePanelSection = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "SuperEllipseLengthStep");
                         }}
                         title={`Step Index: ${lengthStepIndex}`}
@@ -213,10 +212,10 @@ export const SuperEllipsePanelSection = ({
             </div>
 
             {/* N VALUE (CURVATURE) ROW */}
-            <div className={styles.panelRow}>
-                <div className={styles.rowLabel}>N Value</div>
+            <div className={itemClass}>
+                <div className={labelClass}>N Value</div>
                 <div
-                    className={styles.rowContent}
+                    className={contentClass}
                     style={{
                         width: "100%",
                         alignItems: "center",
@@ -229,7 +228,6 @@ export const SuperEllipsePanelSection = ({
                         step={0.1}
                         value={nValue}
                         onChange={(newVal) => {
-                            uiPing();
                             trigger("MertsToolBox", "SuperEllipseSetN", newVal);
                         }}
                         formatValue={(v) => v.toFixed(1)}
@@ -238,16 +236,15 @@ export const SuperEllipsePanelSection = ({
             </div>
 
             {/* SNAP ROW */}
-            <div className={styles.panelRow}>
-                <div className={styles.rowLabel}>Snap</div>
-                <div className={styles.rowContent}>
+            <div className={itemClass}>
+                <div className={labelClass}>Snap</div>
+                <div className={contentClass}>
                     <button
                         className={`${buttonClass} ${iconButtonClass} ${isSnapGeometryActive ? "selected" : ""}`}
                         onMouseDown={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "SuperEllipseToggleSnap", "Geometry");
                         }}
                     >
@@ -260,7 +257,6 @@ export const SuperEllipsePanelSection = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "SuperEllipseToggleSnap", "NetSide");
                         }}
                     >
@@ -273,30 +269,10 @@ export const SuperEllipsePanelSection = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "SuperEllipseToggleSnap", "NetArea");
                         }}
                     >
                         <img className={iconClass} src="Media/Tools/Snap Options/NetArea.svg" alt="Road Node" />
-                    </button>
-                </div>
-            </div>
-
-            {/* SUBSTRACT ROW */}
-            <div className={styles.panelRow}>
-                <div className={styles.rowLabel}>Substract (Experimental)</div>
-                <div className={styles.rowContent}>
-                    <button
-                        className={`${buttonClass} ${iconButtonClass} ${isSubstractActive ? "selected" : ""}`}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0) return;
-                            uiPing();
-                            trigger("MertsToolBox", "ToggleEllipseSubstract");
-                        }}
-                    >
-                        <img src={substractIcon} className={iconClass} alt="Substract" />
                     </button>
                 </div>
             </div>

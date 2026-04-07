@@ -27,7 +27,7 @@
     top: 0;
     left: 0;
     height: 100%;
-    background-color: #1e83aa;
+    background-color: var(--selectedColor);
     border-radius: 3px;
     pointer-events: none;
 }

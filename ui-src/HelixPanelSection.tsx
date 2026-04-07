@@ -16,20 +16,22 @@ const helixTurnStepIndex$ = bindValue<number>("MertsToolBox", "HelixTurnStepInde
 const helixClearance$ = bindValue<number>("MertsToolBox", "HelixClearance");
 const helixClearanceStepIndex$ = bindValue<number>("MertsToolBox", "HelixClearanceStepIndex");
 
+const showSnapRow$ = bindValue<boolean>("MertsToolBox", "ShowSnapRow", false);
 const isSnapGeometryActive$ = bindValue<boolean>("MertsToolBox", "IsSnapGeometryActive");
 const isSnapNetSideActive$ = bindValue<boolean>("MertsToolBox", "IsSnapNetSideActive");
 const isSnapNetAreaActive$ = bindValue<boolean>("MertsToolBox", "IsSnapNetAreaActive");
 
-// --- HELPER FUNCTIONS ---
 
-const uiPing = () => trigger("MertsToolBox", "UiInteracted");
 
 // --- COMPONENT DEFINITION ---
 
 export const HelixPanelSection = ({
     vanillaClasses
 }: {
-    vanillaClasses: {
+        vanillaClasses: {
+        itemClass: string;
+        labelClass: string;
+        contentClass: string;
         buttonClass: string;
         iconClass: string;
         iconButtonClass: string;
@@ -76,11 +78,15 @@ export const HelixPanelSection = ({
     const clearance = useValue(helixClearance$) as number;
     const clearanceStepIndex = useValue(helixClearanceStepIndex$) as number;
 
+    const showSnapRow = useValue(showSnapRow$) as Boolean;
     const isSnapGeometryActive = useValue(isSnapGeometryActive$) as boolean;
     const isSnapNetSideActive = useValue(isSnapNetSideActive$) as boolean;
     const isSnapNetAreaActive = useValue(isSnapNetAreaActive$) as boolean;    
     
     const {
+        itemClass,
+        labelClass,
+        contentClass,
         buttonClass,
         iconButtonClass,
         startButtonClass,
@@ -95,23 +101,29 @@ export const HelixPanelSection = ({
 
     return (
         <div
-            className={`helix-panel-container ${styles.circlePanel}`}
-            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); uiPing(); }}
+            className={`helix-panel-container`}
+            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
             onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
         >
-            <div className={styles.panelHeader}>Helix Intersection</div>
+            <div className={'panel-header'} style={{
+                fontSize: "16rem",
+                fontWeight: 700,
+                paddingTop: "4rem",
+                paddingLeft: "12rem",
+                paddingRight: "12rem",
+                paddingBottom: "4rem"
+            }}>Helix Intersection</div>
 
             {/* DIAMETER ROW */}
-            <div className={styles.panelRow}>
-                <div className={styles.rowLabel}>Diameter</div>
-                <div className={styles.rowContent}>
+            <div className={itemClass}>
+                <div className={labelClass}>Diameter</div>
+                <div className={contentClass}>
                     <button
                         className={`${buttonClass} ${iconButtonClass} ${startButtonClass}`}
                         onMouseDown={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "HelixDiameterDown");
                         }}
                     >
@@ -126,7 +138,6 @@ export const HelixPanelSection = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "HelixDiameterUp");
                         }}
                     >
@@ -139,7 +150,6 @@ export const HelixPanelSection = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "HelixDiameterStep");
                         }}
                         title={`Step Index: ${diameterStepIndex}`}
@@ -155,16 +165,15 @@ export const HelixPanelSection = ({
             </div>
 
             {/* TURNS ROW */}
-            <div className={styles.panelRow}>
-                <div className={styles.rowLabel}>Turns</div>
-                <div className={styles.rowContent}>
+            <div className={itemClass}>
+                <div className={labelClass}>Turns</div>
+                <div className={contentClass}>
                     <button
                         className={`${buttonClass} ${iconButtonClass} ${startButtonClass}`}
                         onMouseDown={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "HelixTurnsDown");
                         }}
                     >
@@ -179,7 +188,6 @@ export const HelixPanelSection = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "HelixTurnsUp");
                         }}
                     >
@@ -192,7 +200,6 @@ export const HelixPanelSection = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "HelixTurnsStep");
                         }}
                         title={`Step Index: ${turnStepIndex}`}
@@ -208,16 +215,15 @@ export const HelixPanelSection = ({
             </div>
 
             {/* CLEARANCE ROW */}
-            <div className={styles.panelRow}>
-                <div className={styles.rowLabel}>Clearance</div>
-                <div className={styles.rowContent}>
+            <div className={itemClass}>
+                <div className={labelClass}>Clearance</div>
+                <div className={contentClass}>
                     <button
                         className={`${buttonClass} ${iconButtonClass} ${startButtonClass}`}
                         onMouseDown={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "HelixClearanceDown");
                         }}
                     >
@@ -232,7 +238,6 @@ export const HelixPanelSection = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "HelixClearanceUp");
                         }}
                     >
@@ -245,7 +250,6 @@ export const HelixPanelSection = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (e.button !== 0) return;
-                            uiPing();
                             trigger("MertsToolBox", "HelixClearanceStep");
                         }}
                         title={`Step Index: ${clearanceStepIndex}`}
@@ -260,50 +264,48 @@ export const HelixPanelSection = ({
                 </div>
             </div>
 
-            {/* SNAP ROW */}
-            <div className={styles.panelRow}>
-                <div className={styles.rowLabel}>Snap</div>
-                <div className={styles.rowContent}>
-                    <button
-                        className={`${buttonClass} ${iconButtonClass} ${isSnapGeometryActive ? "selected" : ""}`}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0) return;
-                            uiPing();
-                            trigger("MertsToolBox", "HelixToggleSnap", "Geometry");
-                        }}
-                    >
-                        <img className={vanillaClasses.iconClass} src="Media/Tools/Snap Options/ExistingGeometry.svg" alt="Geometry" />
-                    </button>
+            {showSnapRow && (
+                <div className={itemClass}>
+                    <div className={labelClass}>Snap</div>
+                    <div className={contentClass}>
+                        <button
+                            className={`${buttonClass} ${iconButtonClass} ${isSnapGeometryActive ? "selected" : ""}`}
+                            onMouseDown={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (e.button !== 0) return;
+                                trigger("MertsToolBox", "HelixToggleSnap", "Geometry");
+                            }}
+                        >
+                            <img className={vanillaClasses.iconClass} src="Media/Tools/Snap Options/ExistingGeometry.svg" alt="Geometry" />
+                        </button>
 
-                    <button
-                        className={`${buttonClass} ${iconButtonClass} ${isSnapNetSideActive ? "selected" : ""}`}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0) return;
-                            uiPing();
-                            trigger("MertsToolBox", "HelixToggleSnap", "NetSide");
-                        }}
-                    >
-                        <img className={vanillaClasses.iconClass} src="Media/Tools/Snap Options/NetSide.svg" alt="Road Side" />
-                    </button>
+                        <button
+                            className={`${buttonClass} ${iconButtonClass} ${isSnapNetSideActive ? "selected" : ""}`}
+                            onMouseDown={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (e.button !== 0) return;
+                                trigger("MertsToolBox", "HelixToggleSnap", "NetSide");
+                            }}
+                        >
+                            <img className={vanillaClasses.iconClass} src="Media/Tools/Snap Options/NetSide.svg" alt="Road Side" />
+                        </button>
 
-                    <button
-                        className={`${buttonClass} ${iconButtonClass} ${isSnapNetAreaActive ? "selected" : ""}`}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0) return;
-                            uiPing();
-                            trigger("MertsToolBox", "HelixToggleSnap", "NetArea");
-                        }}
-                    >
-                        <img className={vanillaClasses.iconClass} src="Media/Tools/Snap Options/NetArea.svg" alt="Road Node" />
-                    </button>
+                        <button
+                            className={`${buttonClass} ${iconButtonClass} ${isSnapNetAreaActive ? "selected" : ""}`}
+                            onMouseDown={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (e.button !== 0) return;
+                                trigger("MertsToolBox", "HelixToggleSnap", "NetArea");
+                            }}
+                        >
+                            <img className={vanillaClasses.iconClass} src="Media/Tools/Snap Options/NetArea.svg" alt="Road Node" />
+                        </button>
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 };

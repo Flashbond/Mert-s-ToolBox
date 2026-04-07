@@ -15,8 +15,6 @@ import helixIcon from "./Icons/Helix.svg";
 import superEllipseIcon from "./Icons/Ellipse.svg";
 import gridIcon from "./Icons/Grid.svg";
 
-const uiPing = () => trigger("MertsToolBox", "UiInteracted");
-
 type ToolId = "Circle" | "Helix" | "SuperEllipse" | "Grid";
 
 type ToolDef = {
@@ -49,73 +47,15 @@ function preloadAllToolIcons() {
     });
 }
 
-const IconPreloader = () => {
-    useEffect(() => {
-        preloadAllToolIcons();
-    }, []);
-
-    return (
-        <div
-            style={{
-                position: "absolute",
-                width: "0",
-                height: "0",
-                overflow: "hidden",
-                opacity: 0,
-                pointerEvents: "none"
-            }}
-        >
-            {PRELOAD_ICON_SRCS.map((src, idx) => (
-                <img key={idx} src={src} alt="" width={1} height={1} aria-hidden="true" draggable={false} />
-            ))}
-        </div>
-    );
-};
-
-function getDisplayNameFromTitle(title: any): string {
-    try {
-        const direct = title?.type?.displayName;
-        if (typeof direct === "string") return direct;
-
-        const memoType = title?.type?.type?.displayName;
-        if (typeof memoType === "string") return memoType;
-
-        const renderString = title?.type?.renderString;
-        if (typeof renderString === "function") {
-            const rendered = renderString();
-            if (typeof rendered === "string") return rendered;
-        }
-    } catch {
-        // ignore
-    }
-
-    return "";
-}
-
-function isContourLinesSection(title: any): boolean {
-    return getDisplayNameFromTitle(title).includes("CONTOUR_LINES");
-}
-
-function panelHasGridSvg(): boolean {
-    try {
-        const panel = document.querySelector('[class*="tool-options-panel_"]');
-        if (!panel) return false;
-
-        return !!panel.querySelector('img[src*="Grid.svg"]');
-    } catch {
-        return false;
-    }
-}
-
 const ToolBoxModeRow = () => {
-    const { buttonClass, iconClass, iconButtonClass } = useVanillaClasses();
+    const { itemClass, labelClass, contentClass, buttonClass, iconClass, iconButtonClass } = useVanillaClasses();
     const activeTool = useValue(activeToolMode$);
 
     return (
-        <div className="item_bZY">
-            <div className={styles.rowLabel}>Mert&apos;s ToolBox</div>
+        <div className={itemClass}>
+            <div className={labelClass}>Mert&apos;s ToolBox</div>
 
-            <div className="content_ZIz">
+            <div className={contentClass}>
                 {TOOL_DEFS.map((tool) => {
                     const isSelected = activeTool === tool.id;
 
@@ -161,18 +101,33 @@ const register: ModRegistrar = (moduleRegistry) => {
     moduleRegistry.extend(mouseToolPath, "MouseToolOptions", (OriginalMouseToolOptions: any) => {
         return (props: any) => {
             const vanillaClasses = useVanillaClasses();
+            const isAllowed = useValue(isToolBoxAllowed$) as boolean;
+            const activeTool = useValue(activeToolMode$) as string;
+            const isActive = isAllowed && activeTool !== "None";
+
+            useEffect(() => {
+                preloadAllToolIcons();
+            }, []);
+
+            if (!isActive) {
+                return (
+                    <>
+                        <OriginalMouseToolOptions {...props} />
+                        {isAllowed && <ToolBoxModeRow />}
+                    </>
+                );
+            }
 
             return (
                 <div
                     className="merts-toolbox-root"
-                    onMouseDownCapture={() => uiPing()}
-                    onMouseUpCapture={() => uiPing()}
-                    onClickCapture={() => uiPing()}
-                    onContextMenuCapture={() => uiPing()}
-                    style={{ width: "100%", display: "flex", flexDirection: "column", pointerEvents: "auto" }}
+                    style={{
+                        width: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        pointerEvents: "auto"
+                    }}
                 >
-                    <IconPreloader />
-                    <OriginalMouseToolOptions {...props} />
                     <ToolBoxActionHints />
                     <CirclePanelSection vanillaClasses={vanillaClasses} />
                     <HelixPanelSection vanillaClasses={vanillaClasses} />
@@ -180,46 +135,6 @@ const register: ModRegistrar = (moduleRegistry) => {
                     <GridPanelSection vanillaClasses={vanillaClasses} />
                 </div>
             );
-        };
-    });
-
-    moduleRegistry.extend(mouseToolPath, "Section", (OriginalSection: any) => {
-        return (props: any) => {
-            const isAllowed = useValue(isToolBoxAllowed$) as boolean;
-            const activeTool = useValue(activeToolMode$) as string;
-            const isActive = isAllowed && activeTool !== "None";
-
-            const mutableChildren = Array.isArray(props.children)
-                ? [...props.children]
-                : (props.children !== undefined && props.children !== null ? [props.children] : []);
-
-            const safeProps = { ...props, children: mutableChildren };
-
-            const isContourSection = isContourLinesSection(props.title);
-            const hasGridSvg = panelHasGridSvg();
-
-            const shouldInjectToolBoxRow =
-                isAllowed &&
-                !isActive &&
-                isContourSection &&
-                hasGridSvg;
-
-            if (!isAllowed) return <OriginalSection {...safeProps} />;
-
-            if (isActive) {
-                return <></>;
-            }
-
-            if (shouldInjectToolBoxRow) {
-                return (
-                    <>
-                        <OriginalSection {...safeProps} />
-                        <ToolBoxModeRow />
-                    </>
-                );
-            }
-
-            return <OriginalSection {...safeProps} />;
         };
     });
 };
