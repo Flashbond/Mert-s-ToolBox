@@ -28,6 +28,9 @@
 	  <None Remove="BounceCatcher.cs.txt" />
 	</ItemGroup>
 	<ItemGroup>
+	  <Compile Include="MertBaseToolSystem.Reflection.txt" />
+	  <Compile Include="MertHarmonyPatches.PipelineTrace.txt" />
+	  <Compile Include="MertSubtractCleanupSystem.txt" />
 	  <Compile Include="ModRuntime.cs.txt" />
 	</ItemGroup>
 	
@@ -108,6 +111,7 @@
 		  <Pack>True</Pack>
 		  <PackagePath>\</PackagePath>
 		</None>
+		<None Include="MertHarmonyPatches.cs" />
 	</ItemGroup>
 
 	<ItemGroup>

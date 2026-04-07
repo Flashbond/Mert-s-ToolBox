@@ -59,6 +59,9 @@ namespace MertsToolBox
 
                 { m_Settings.GetOptionLabelLocaleID(nameof(Settings.UseCtrlWheelForHelixTurnAdjustment)), "Use Ctrl+Wheel for Helix Diameter Adjustment" },
                 { m_Settings.GetOptionDescLocaleID(nameof(Settings.UseCtrlWheelForHelixTurnAdjustment)), "Allows the Helix tool diameter to be adjusted with Ctrl+Mouse Wheel. Recommended to turn this off if it conflicts with another binding." },
+                
+                { m_Settings.GetOptionLabelLocaleID(nameof(Settings.EnableHelixSnap)), "Enable Helix Snap" },
+                { m_Settings.GetOptionDescLocaleID(nameof(Settings.EnableHelixSnap)), "Enables snap functionality for Helix tool." },
 
                 // -------------------------
                 // Super Ellipse
@@ -86,6 +89,9 @@ namespace MertsToolBox
 
                 { m_Settings.GetOptionLabelLocaleID(nameof(Settings.Rows)), "Rows" },
                 { m_Settings.GetOptionDescLocaleID(nameof(Settings.Rows)), "Sets the default number of rows used by the Grid tool." },
+
+                { m_Settings.GetOptionLabelLocaleID(nameof(Settings.EnableGridSnap)), "Enable Grid Snap" },
+                { m_Settings.GetOptionDescLocaleID(nameof(Settings.EnableGridSnap)), "Enables snap functionality for Grid tool." },
             };
         }
 

@@ -1,6 +1,5 @@
 ﻿using Colossal.Entities;
 using Game.Prefabs;
-using System;
 using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
@@ -9,36 +8,45 @@ namespace MertsToolBox
 {
     public abstract partial class MertBaseToolSystem
     {
-        #region COST ENGINE
-
+        #region Cost Calculation & Metadata
         /// <summary>
-        /// Calculates the construction and upkeep costs based on the road's length and elevation, and applies them to the stamp.
+        /// Calculates and applies the construction and upkeep cost metadata to the given stamp based on road composition and elevation.
         /// </summary>
-        protected bool TryCalculateAndApplyCosts(AssetStampPrefab stamp, ObjectSubNetInfo[] subNets, NetPrefab roadPrefab, float highestElevation)
+        protected void ApplyCostMetadata(AssetStampPrefab stamp, ObjectSubNetInfo[] subNets, NetPrefab roadPrefab, float costElevation)
         {
-            if (stamp == null || subNets == null || subNets.Length == 0 || roadPrefab == null) return false;
+            if (stamp == null || subNets == null || roadPrefab == null) return;
+            if (TryGetBestMatchingCompositionEntity(roadPrefab, costElevation, out Entity compositionEntity) &&
+                EntityManager.TryGetComponent(compositionEntity, out Game.Prefabs.PlaceableNetComposition comp))
+            {
+                float totalLength = CalculateTotalLength(subNets);
+                float absElevation = math.abs(costElevation);
+                int cells = math.max(1, Mathf.RoundToInt(totalLength / 8f));
+                int elevationSteps = math.max(0, Mathf.RoundToInt(absElevation / 10f));
 
-            if (!TryGetBestMatchingCompositionEntity(roadPrefab, highestElevation, out Entity compositionEntity)) return false;
-            if (compositionEntity == Entity.Null || !EntityManager.Exists(compositionEntity)) return false;
-            if (!EntityManager.TryGetComponent(compositionEntity, out Game.Prefabs.PlaceableNetComposition comp)) return false;
+                uint finalConstruction = (uint)math.max(100, cells * ((int)comp.m_ConstructionCost + elevationSteps * (int)comp.m_ElevationCost));
+                uint finalUpkeep = (uint)math.max(10, cells * (int)comp.m_UpkeepCost);
 
-            float totalLength = CalculateTotalLength(subNets);
-            float absElevation = math.abs(highestElevation);
-
-            int cells = math.max(1, Mathf.RoundToInt(totalLength / 8f));
-            int elevationSteps = math.max(0, Mathf.RoundToInt(absElevation / 10f));
-
-            int construction = cells * ((int)comp.m_ConstructionCost + elevationSteps * (int)comp.m_ElevationCost);
-            int upkeep = cells * (int)comp.m_UpkeepCost;
-
-            stamp.m_ConstructionCost = (uint)math.max(100, construction);
-            stamp.m_UpKeepCost = (uint)math.max(10, upkeep);
-
-            return true;
+                if (stamp.m_ConstructionCost != finalConstruction || stamp.m_UpKeepCost != finalUpkeep)
+                {
+                    stamp.m_ConstructionCost = finalConstruction;
+                    stamp.m_UpKeepCost = finalUpkeep;
+                    stamp.asset?.MarkDirty();
+                }
+            }
+            else
+            {
+                uint fallbackCost = (uint)math.max(100, (subNets.Length * 100));
+                if (stamp.m_ConstructionCost != fallbackCost)
+                {
+                    stamp.m_ConstructionCost = fallbackCost;
+                    stamp.m_UpKeepCost = (uint)math.max(10, (subNets.Length * 10));
+                    stamp.asset?.MarkDirty();
+                }
+            }
         }
 
         /// <summary>
-        /// Finds the most appropriate net composition entity based on the given elevation and road prefab.
+        /// Attempts to find the most appropriate net composition entity matching the given road prefab and elevation.
         /// </summary>
         private bool TryGetBestMatchingCompositionEntity(NetPrefab roadPrefab, float y, out Entity compositionEntity)
         {
@@ -77,9 +85,11 @@ namespace MertsToolBox
             }
             return false;
         }
+        #endregion
 
+        #region Curve & Length Mathematics
         /// <summary>
-        /// Calculates the total approximate length of all sub-nets.
+        /// Calculates the total approximate length of all bezier curves within the provided sub-networks.
         /// </summary>
         private float CalculateTotalLength(ObjectSubNetInfo[] subNets)
         {
@@ -92,7 +102,7 @@ namespace MertsToolBox
         }
 
         /// <summary>
-        /// Approximates the length of a given Bezier curve by dividing it into line segments.
+        /// Approximates the arc length of a single bezier curve using segmented straight lines.
         /// </summary>
         private float ApproximateBezierLength(Colossal.Mathematics.Bezier4x3 curve, int steps)
         {
@@ -110,56 +120,12 @@ namespace MertsToolBox
         }
 
         /// <summary>
-        /// Calculates a specific point on a Bezier curve given a parameter t between 0 and 1.
+        /// Computes the specific coordinate position along a cubic bezier curve at a given time value t.
         /// </summary>
         private float3 BezierPosition(Colossal.Mathematics.Bezier4x3 c, float t)
         {
             float u = 1f - t;
             return u * u * u * c.a + 3f * u * u * t * c.b + 3f * u * t * t * c.c + t * t * t * c.d;
-        }
-
-        /// <summary>
-        /// Queues a cost calculation to be resolved in future frames if the entity is not fully initialized yet.
-        /// </summary>
-        protected void QueueDeferredCostResolve(AssetStampPrefab stamp, ObjectSubNetInfo[] subNets, NetPrefab roadPrefab, float highestElevation)
-        {
-            m_PendingCostResolve = true;
-            m_CostResolveRetries = 10;
-            m_PendingCostStamp = stamp;
-            m_PendingCostSubNets = subNets;
-            m_PendingCostRoadPrefab = roadPrefab;
-            m_PendingCostHighestElevation = highestElevation;
-        }
-
-        /// <summary>Processes any pending deferred cost calculations, retrying a set number of times before giving up.</summary>
-        private void HandlePendingCostResolve()
-        {
-            if (!m_PendingCostResolve) return;
-
-            if (m_PendingCostStamp != null && m_PendingCostSubNets != null && m_PendingCostRoadPrefab != null)
-            {
-                if (TryCalculateAndApplyCosts(m_PendingCostStamp, m_PendingCostSubNets, m_PendingCostRoadPrefab, m_PendingCostHighestElevation))
-                {
-                    m_PrefabSystem.UpdatePrefab(m_PendingCostStamp, RuntimeStampEntity);
-
-                    m_PendingCostResolve = false;
-                    m_CostResolveRetries = 0;
-                    m_PendingCostStamp = null;
-                    m_PendingCostSubNets = null;
-                    m_PendingCostRoadPrefab = null;
-
-                    return;
-                }
-
-                m_CostResolveRetries--;
-                if (m_CostResolveRetries <= 0)
-                {
-                    m_PendingCostResolve = false;
-                    m_PendingCostStamp = null;
-                    m_PendingCostSubNets = null;
-                    m_PendingCostRoadPrefab = null;
-                }
-            }
         }
         #endregion
     }

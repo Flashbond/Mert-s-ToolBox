@@ -22,22 +22,24 @@ namespace MertsToolBox
         public const string GROUP_DEFAULTS = "Defaults";
         public const string GROUP_CONTROLS = "Controls";
 
-        private int m_DefaultCircleDiameter = 80;
+        private int m_DefaultCircleDiameter = 96;
         private bool m_UseCtrlWheelForCircleDiameterAdjustment = false;
 
-        private int m_DefaultHelixDiameter = 80;
+        private int m_DefaultHelixDiameter = 96;
         private float m_DefaultTurns = 3f;
         private float m_DefaultClearance = 8f;
         private bool m_UseCtrlWheelForHelixTurnAdjustment = false;
+        private bool m_EnableHelixSnap = false;
 
-        private int m_DefaultEllipseWidth = 80;
-        private int m_DefaultEllipseLength = 160;
+        private int m_DefaultEllipseWidth = 96;
+        private int m_DefaultEllipseLength = 192;
         private bool m_UseCtrlWheelForShapeAdjustment = false;
 
-        private int m_BlockWidthU = 2;
-        private int m_BlockLengthU = 2;
+        private int m_BlockWidthU = 6;
+        private int m_BlockLengthU = 6;
         private int m_Columns = 2;
         private int m_Rows = 2;
+        private bool m_EnableGridSnap = false;
 
         public static event Action OnOptionsChanged;
 
@@ -139,7 +141,18 @@ namespace MertsToolBox
                 OnOptionsChanged?.Invoke();
             }
         }
+        [SettingsUISection(TAB_HELIX, GROUP_CONTROLS)]
+        public bool EnableHelixSnap
+        {
+            get => m_EnableHelixSnap;
+            set
+            {
+                if (m_EnableHelixSnap == value) return;
 
+                m_EnableHelixSnap = value;
+                OnOptionsChanged?.Invoke();
+            }
+        }
         // -------------------------
         // Super Ellipse
         // -------------------------
@@ -250,25 +263,38 @@ namespace MertsToolBox
                 OnOptionsChanged?.Invoke();
             }
         }
+        [SettingsUISection(TAB_GRID, GROUP_CONTROLS)]
+        public bool EnableGridSnap
+        {
+            get => m_EnableGridSnap;
+            set
+            {
+                if (m_EnableGridSnap == value) return;
 
+                m_EnableGridSnap = value;
+                OnOptionsChanged?.Invoke();
+            }
+        }
         public override void SetDefaults()
         {
-            m_DefaultCircleDiameter = 80;
+            m_DefaultCircleDiameter = 96;
             m_UseCtrlWheelForCircleDiameterAdjustment = false;
 
-            m_DefaultHelixDiameter = 80;
+            m_DefaultHelixDiameter = 96;
             m_DefaultTurns = 3f;
             m_DefaultClearance = 8f;
             m_UseCtrlWheelForHelixTurnAdjustment = false;
+            m_EnableHelixSnap = false;
 
-            m_DefaultEllipseWidth = 80;
-            m_DefaultEllipseLength = 160;
+            m_DefaultEllipseWidth = 96;
+            m_DefaultEllipseLength = 192;
             m_UseCtrlWheelForShapeAdjustment = false;
 
-            m_BlockWidthU = 2;
-            m_BlockLengthU = 2;
+            m_BlockWidthU = 6;
+            m_BlockLengthU = 6;
             m_Columns = 2;
             m_Rows = 2;
+            m_EnableGridSnap = false;
         }
 
         public override void Apply()

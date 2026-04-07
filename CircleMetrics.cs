@@ -1,10 +1,4 @@
-﻿using Colossal.Mathematics;
-using Game.Common;
-using Game.Prefabs;
-using System;
-using Unity.Collections;
-using Unity.Entities;
-using Unity.Mathematics;
+﻿using Unity.Mathematics;
 
 namespace MertsToolBox
 {

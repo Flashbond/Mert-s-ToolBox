@@ -1,54 +1,144 @@
-using Game.Prefabs;
-using Game.Tools;
+using Game.UI.InGame;
 using HarmonyLib;
-using System;
-using System.Reflection;
+using System.Collections.Generic;
 using Unity.Entities;
-using Unity.Jobs;
-using Unity.Mathematics;
 
 namespace MertsToolBox
 {
-    [HarmonyPatch(typeof(Game.UI.InGame.ToolbarUISystem), "SelectAssetCategory")]
-    public class ToolbarUISystem_SelectAssetCategory_Patch
-    {
-        public static void Prefix(Entity assetCategory)
-        {
-            if (MertToolState.SuppressCategoryCapture) return;
-            if (MertToolState.SuppressUiAbortDuringRestore) return;
 
+    [HarmonyPatch(typeof(ToolbarUISystem), "SelectAssetCategory")]
+    public static class ToolbarUISystem_SelectAssetCategory_HandoffPatch
+    {
+        public static void Prefix(ToolbarUISystem __instance, Entity assetCategory)
+        {
+            if (MertToolState.SuppressToolbarCaptureDuringColdstart)
+                return;
+            if (assetCategory == Entity.Null)
+                return;
+
+            if (MertToolState.SuppressCategoryCapture)
+                return;
+
+            if (MertToolState.SuppressUiAbortDuringRestore)
+                return;
+
+            if (!MertToolbarHandoffMemory.IsAnyCustomToolOpen())
+                return;
+
+            if (!MertToolbarHandoffMemory.IsRoadsCategory(assetCategory))
+                return;
+
+            MertToolState.LiveUiCategory = assetCategory;
+            MertToolState.LastResolvedCategory = assetCategory;
             MertToolState.UserJustChangedAssetCategory = true;
             MertToolState.BlockRoadPrefabFallbackUntilNextRealSelection = true;
-            MertToolState.OnToolAbortedByUI?.Invoke(ToolExitMode.SilentTabClose);
-            MertToolState.LastResolvedCategory = assetCategory;
-        }
-    }
 
-    [HarmonyPatch(typeof(Game.UI.InGame.ToolbarUISystem), "SelectAsset", new Type[] { typeof(Entity), typeof(bool) })]
-    public class ToolbarUISystem_SelectAsset_Patch
-    {
-        public static void Prefix(Entity assetEntity, bool updateTool)
-        {
-            string entityStr = assetEntity == Entity.Null ? "NULL" : assetEntity.Index.ToString();
-           
-            if (MertToolState.SuppressUiMemoryCapture) return;
-
-            if (!MertToolState.SuppressUiAbortDuringRestore && updateTool && assetEntity != Entity.Null)
+            if (MertToolState.TabHandoffFromCategory != Entity.Null &&
+                MertToolState.TabHandoffFromRoad != null &&
+                MertToolState.TabHandoffFromCategory != assetCategory)
             {
-                MertToolState.OnToolAbortedByUI?.Invoke(ToolExitMode.UserSelectionClose);
+                _ = MertToolbarHandoffMemory.TryInjectSourceCategoryMemory(
+                    __instance,
+                    MertToolState.TabHandoffFromCategory,
+                    MertToolState.TabHandoffFromRoad);
             }
 
-            if (assetEntity == Entity.Null) return;
+            MertToolState.ActivateTabHandoff(assetCategory);
+            MertToolState.OnToolAbortedByUI?.Invoke(ToolExitMode.SilentTabClose);
+        }
+    }
+    [HarmonyPatch(typeof(ToolbarUISystem), "Apply",
+        new System.Type[]
+        {
+            typeof(List<Entity>),
+            typeof(List<Entity>),
+            typeof(Entity),
+            typeof(Entity),
+            typeof(Entity),
+            typeof(bool)
+        })]
+    public static class ToolbarUISystem_Apply_HandoffPatch
+    {
+        public static void Prefix(
+   
+        ToolbarUISystem __instance,
+            List<Entity> themes,
+            List<Entity> packs,
+            ref Entity assetMenuEntity,
+            ref Entity assetCategoryEntity,
+            ref Entity assetEntity,
+            ref bool updateTool)
+        {
 
-            var prefabSystem = World.DefaultGameObjectInjectionWorld?.GetExistingSystemManaged<PrefabSystem>();
-            if (prefabSystem != null && prefabSystem.TryGetPrefab<PrefabBase>(assetEntity, out var prefab))
+            if (!MertToolState.TabHandoffActive && !MertToolState.PendingRestore)
+                return;
+            if (assetCategoryEntity == Entity.Null)
+                return;
+            if (assetCategoryEntity != MertToolState.TabHandoffToCategory)
+                return;
+            if (!MertToolbarHandoffMemory.IsRoadsCategory(assetCategoryEntity))
+                return;
+
+            bool incomingIsNull = assetEntity == Entity.Null;
+            bool incomingIsStamp = false;
+
+            if (!incomingIsNull &&
+                MertToolbarHandoffMemory.TryResolvePrefab(assetEntity, out var incomingPrefab))
             {
-                if (prefab is NetPrefab netPrefab)
-                {
-                    MertToolState.LastResolvedRoadPrefab = netPrefab;
-                    MertToolState.BlockRoadPrefabFallbackUntilNextRealSelection = false;
-                    MertToolState.UserJustChangedAssetCategory = false;
-                }
+                incomingIsStamp = MertToolbarHandoffMemory.IsOurStamp(incomingPrefab);
+            }
+
+            if (!incomingIsNull && !incomingIsStamp)
+                return;
+
+            if (MertToolState.TabHandoffFromRoad == null)
+                return;
+
+            if (!MertToolbarHandoffMemory.TryResolveEntity(MertToolState.TabHandoffFromRoad, out var realRoadEntity))
+                return;
+
+            assetEntity = realRoadEntity;
+            updateTool = true;
+        }
+    }
+    [HarmonyPatch(typeof(ToolbarUISystem), "SelectAsset", new System.Type[] { typeof(Entity), typeof(bool) })]
+    public static class ToolbarUISystem_SelectAsset_HandoffPatch
+    {
+        public static void Prefix(ref Entity assetEntity, ref bool updateTool)
+        {
+            if (assetEntity == Entity.Null)
+                return;
+
+            if (MertToolState.SuppressUiMemoryCapture)
+                return;
+
+            if (MertToolState.SuppressLiveUiCapture)
+                return;
+
+            if (!MertToolbarHandoffMemory.IsAnyCustomToolOpen())
+                return;
+
+            if (!MertToolbarHandoffMemory.IsRoadNetPrefab(assetEntity, out var netPrefab))
+                return;
+
+            MertToolState.LiveUiRoadPrefab = netPrefab;
+            MertToolState.LastResolvedRoadPrefab = netPrefab;
+            MertToolState.BlockRoadPrefabFallbackUntilNextRealSelection = false;
+
+            if (MertToolbarHandoffMemory.TryResolveCategoryFromAsset(assetEntity, out var category))
+            {
+                MertToolState.LiveUiCategory = category;
+                MertToolState.LastResolvedCategory = category;
+            }
+
+            if (MertToolState.TabHandoffActive)
+            {
+                MertToolState.ClearTabHandoff();
+            }
+
+            if (!MertToolState.SuppressUiAbortDuringRestore)
+            {
+                MertToolState.OnToolAbortedByUI?.Invoke(ToolExitMode.UserSelectionClose);
             }
         }
     }

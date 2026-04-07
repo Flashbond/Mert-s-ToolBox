@@ -1,15 +1,44 @@
 ﻿using Game.Tools;
-using System;
-using Unity.Entities;
-using Unity.Mathematics;
 
 namespace MertsToolBox
 {
     public abstract partial class MertBaseToolSystem
     {
-        #region SNAP CONTROL
+        #region Fields & State
+        protected bool m_SnapGeometryEnabled = true;
+        protected bool m_SnapNetSideEnabled = false;
+        protected bool m_SnapNetAreaEnabled = true;
 
-        /// <summary>Toggles the specified snapping state (Geometry, NetSide, or NetArea) and triggers a preview rebuild.</summary>
+        protected bool m_HasStoredSnapMask;
+        protected Snap m_StoredSnapMask;
+        #endregion
+
+        #region State Retrieval
+        /// <summary>
+        /// Gets a value indicating whether geometry snapping is currently enabled.
+        /// </summary>
+        public bool IsSnapGeometryEnabled() => m_SnapGeometryEnabled;
+
+        /// <summary>
+        /// Gets a value indicating whether network side snapping is currently enabled.
+        /// </summary>
+        public bool IsSnapNetSideEnabled() => m_SnapNetSideEnabled;
+
+        /// <summary>
+        /// Gets a value indicating whether network area snapping is currently enabled.
+        /// </summary>
+        public bool IsSnapNetAreaEnabled() => m_SnapNetAreaEnabled;
+        #endregion
+
+        #region Input Queuing & Toggling
+        /// <summary>
+        /// Queues a toggle action for the specified snap type.
+        /// </summary>
+        public void QueueSnapToggle(string snapType) => ToggleSnap(snapType);
+
+        /// <summary>
+        /// Toggles the specified snap setting and applies the updated mask to the active tool.
+        /// </summary>
         public void ToggleSnap(string snapType)
         {
             switch (snapType)
@@ -27,127 +56,63 @@ namespace MertsToolBox
                     break;
             }
 
-            ApplyRoadSnapState();
-            QueuePreviewRebuild();
-        }
+            ApplySnapMaskToActiveTool();
 
-        /// <summary>Constructs and returns the active snap mask bitfield based on the currently enabled snapping options.</summary>
+            if (ToolEnabled)
+            {
+                QueuePreviewRebuild();
+            }
+        }
+        #endregion
+
+        #region Mask Computation & Application
+        /// <summary>
+        /// Builds and returns the current combined snap mask based on active settings.
+        /// </summary>
         protected Snap BuildCurrentSnapMask()
         {
             Snap mask = Snap.None;
 
-            if (m_SnapGeometryEnabled)
-                mask |= Snap.ExistingGeometry;
-
-            if (m_SnapNetSideEnabled)
-                mask |= Snap.NetSide;
-
-            if (m_SnapNetAreaEnabled)
-                mask |= Snap.NetArea | Snap.NetNode;
+            if (m_SnapGeometryEnabled) mask |= Snap.ExistingGeometry;
+            if (m_SnapNetSideEnabled) mask |= Snap.NetSide;
+            if (m_SnapNetAreaEnabled) mask |= Snap.NetArea | Snap.NetNode;
 
             return mask;
         }
 
-        /// <summary>Applies the current snap mask to the active tool, forcefully updating private states if the object tool is active.</summary>
-        protected void ApplyRoadSnapState()
+        /// <summary>
+        /// Determines the ultimate desired snap mask, considering whether the tool enforces snapping.
+        /// </summary>
+        private Snap GetDesiredSnapMask()
         {
-            try
-            {
-                if (m_ToolSystem?.activeTool == null)
-                    return;
-
-                Snap applied = m_RoadSnapEnabled ? BuildCurrentSnapMask() : Snap.None;
-
-                // ObjectTool aktifse hem public hem private state'i zorla güncelle.
-                if (m_ToolSystem.activeTool == m_ObjectToolSystem)
-                {
-                    m_ObjectToolSystem.selectedSnap = applied;
-
-                    SetObjectToolPrivateField("m_SelectedSnap", applied);
-                    SetObjectToolPrivateField("m_State", ObjectToolSystem.State.Default);
-                    SetObjectToolPrivateField("m_ForceUpdate", true);
-
-                    InvokeObjectToolPrivateMethod("InitializeRaycast");
-                    return;
-                }
-
-                // NetTool / diğer toollar için sadece public selectedSnap yeterli.
-                if (m_ToolSystem.activeTool.selectedSnap != applied)
-                {
-                    m_ToolSystem.activeTool.selectedSnap = applied;
-                }
-            }
-            catch (Exception e)
-            {
-                UnityEngine.Debug.LogWarning($"[MertsToolBox] ApplyRoadSnapState error: {e.Message}");
-            }
+            return RequiresSnapEnforcement ? BuildCurrentSnapMask() : Snap.None;
         }
 
-        /// <summary>Continuously monitors and enforces snap metadata on the stamp entity, correcting any internal tool mismatches.</summary>
-        private void EnforceRuntimeStampSnapMetadata()
+        /// <summary>
+        /// Applies the calculated snap mask directly to the active tool system.
+        /// </summary>
+        private void ApplySnapMaskToActiveTool()
         {
-            try
+            if (m_ToolSystem?.activeTool == null)
+                return;
+            Snap targetSnap = GetDesiredSnapMask();
+
+            if (m_ToolSystem.activeTool == m_ObjectToolSystem)
             {
-                if (!ToolEnabled || RuntimeStampEntity == Entity.Null || !EntityManager.Exists(RuntimeStampEntity))
-                    return;
-
-                bool changed = false;
-
-                changed |= ApplyStampSnapMetadataToEntity(RuntimeStampEntity);
-
-                bool toolSnapMismatch = false;
-
-                if (m_ToolSystem.activeTool == m_ObjectToolSystem)
+                if (m_ObjectToolSystem.selectedSnap != targetSnap)
                 {
-                    Snap expectedSnap = m_RoadSnapEnabled ? BuildCurrentSnapMask() : Snap.None;
-                    if (m_ObjectToolSystem.selectedSnap != expectedSnap)
-                    {
-                        toolSnapMismatch = true;
-                    }
+                    m_ObjectToolSystem.selectedSnap = targetSnap;
                 }
 
-                if ((changed || toolSnapMismatch) && m_ToolSystem.activeTool == m_ObjectToolSystem)
-                {
-                    Snap applied = m_RoadSnapEnabled ? BuildCurrentSnapMask() : Snap.None;
-
-                    m_ObjectToolSystem.selectedSnap = applied;
-                    SetObjectToolPrivateField("m_SelectedSnap", applied);
-                    SetObjectToolPrivateField("m_ForceUpdate", true);
-
-                    InvokeObjectToolPrivateMethod("InitializeRaycast");
-                }
+                SetObjectToolPrivateField("m_SelectedSnap", targetSnap);
+                return;
             }
-            catch (Exception e)
+
+            if (m_ToolSystem.activeTool.selectedSnap != targetSnap)
             {
-                UnityEngine.Debug.LogWarning($"[MertsToolBox] EnforceRuntimeStampSnapMetadata error: {e.Message}");
+                m_ToolSystem.activeTool.selectedSnap = targetSnap;
             }
         }
-
-        /// <summary>Reverts the snap mask back to its originally stored state for the default or network tool upon exit.</summary>
-        private void RestoreSnapState()
-        {
-            try
-            {
-                if (!m_HasStoredSnapMask || m_ToolSystem?.activeTool == null)
-                    return;
-
-                // Restore sadece normal tool tarafında anlamlı
-                if (m_ToolSystem.activeTool == m_NetToolSystem ||
-                    m_ToolSystem.activeTool.GetType().Name == "DefaultToolSystem")
-                {
-                    m_ToolSystem.activeTool.selectedSnap = m_StoredSnapMask;
-                }
-            }
-            catch (Exception e)
-            {
-                UnityEngine.Debug.LogWarning($"[MertsToolBox] RestoreSnapState error: {e.Message}");
-            }
-            finally
-            {
-                m_HasStoredSnapMask = false;
-            }
-        }
-
         #endregion
     }
 }

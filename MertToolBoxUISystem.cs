@@ -1,17 +1,17 @@
 using Colossal.UI.Binding;
+using Game.Prefabs;
 using Game.Tools;
 using Game.UI;
 using System;
+using System.Globalization;
 using Unity.Entities;
 using UnityEngine.Scripting;
-using System.Globalization;
 
 namespace MertsToolBox
 {
     public partial class MertToolBoxUISystem : UISystemBase
     {
-        #region 1. CONSTANTS & SYSTEM REFERENCES
-
+        #region Constants & Fields
         private const string ModId = "MertsToolBox";
         private ToolSystem m_ToolSystem;
 
@@ -19,67 +19,30 @@ namespace MertsToolBox
         private HelixToolSystem m_HelixTool;
         private SuperEllipseToolSystem m_SuperEllipseTool;
         private GridToolSystem m_GridTool;
-
         #endregion
 
-        #region 2. GLOBAL UI STATE BINDINGS
+        #region Nested Types
+        /// <summary>
+        /// A generic polling binding class used to synchronize backend values with the UI automatically.
+        /// </summary>
+        public class MertPolledBinding<T> : ValueBinding<T>, IUpdateBinding
+        {
+            private Func<T> m_Getter;
 
-        public static DateTime m_LastUiInteractionTime = DateTime.MinValue;
-        private ValueBinding<string> m_ActiveToolBinding;
-        private ValueBinding<bool> m_IsToolBoxAllowedBinding;
-
+            public MertPolledBinding(string group, string name, Func<T> getter, T initialValue = default)
+                : base(group, name, initialValue)
+            {
+                m_Getter = getter;
+            }
+            public bool Update()
+            {
+                base.Update(m_Getter());
+                return true;
+            }
+        }
         #endregion
 
-        #region 3. SHARED SNAP & TOGGLE BINDINGS
-
-        private ValueBinding<bool> m_IsSnapGeometryActiveBinding;
-        private ValueBinding<bool> m_IsSnapNetSideActiveBinding;
-        private ValueBinding<bool> m_IsSnapNetAreaActiveBinding;
-        private ValueBinding<bool> m_IsSubstractActiveBinding;
-
-        #endregion
-
-        #region 4. TOOL-SPECIFIC BINDINGS
-
-        // Circle
-        private ValueBinding<float> m_CircleDiameterBinding;
-        private ValueBinding<int> m_CircleDiameterStepIndexBinding;
-        private ValueBinding<int> m_CircleDiameterStepSizeBinding;
-
-        // Helix
-        private ValueBinding<float> m_HelixDiameterBinding;
-        private ValueBinding<int> m_HelixDiameterStepIndexBinding;
-        private ValueBinding<float> m_HelixTurnsBinding;
-        private ValueBinding<int> m_HelixTurnStepIndexBinding;
-        private ValueBinding<float> m_HelixClearanceBinding;
-        private ValueBinding<int> m_HelixClearanceStepIndexBinding;
-
-        // SuperEllipse
-        private ValueBinding<float> m_SuperEllipseWidthBinding;
-        private ValueBinding<int> m_SuperEllipseWidthStepIndexBinding;
-        private ValueBinding<float> m_SuperEllipseLengthBinding;
-        private ValueBinding<int> m_SuperEllipseLengthStepIndexBinding;
-        private ValueBinding<float> m_SuperEllipseNBinding;
-
-        // Grid
-        private ValueBinding<int> m_GridBlockWidthBinding;
-        private ValueBinding<int> m_GridBlockLengthBinding;
-        private ValueBinding<int> m_GridColumnsBinding;
-        private ValueBinding<int> m_GridRowsBinding;
-        private ValueBinding<bool> m_GridAlternatingBinding;
-        private ValueBinding<bool> m_GridOrientationLeftBottomBinding;
-        private ValueBinding<bool> m_GridIsOneWaySupportedBinding;
-
-        // Hints
-        private ValueBinding<bool> m_ShowCircleCtrlWheelHintBinding;
-        private ValueBinding<bool> m_ShowHelixCtrlWheelHintBinding;
-        private ValueBinding<bool> m_ShowSuperEllipseCtrlWheelHintBinding;
-        private ValueBinding<string> m_ActionStatusTextBinding;
-
-        #endregion
-
-        #region 5. ECS LIFECYCLE
-
+        #region Lifecycle Methods
         /// <summary>
         /// Initializes system references, sets up event listeners, and registers UI bindings upon creation.
         /// </summary>
@@ -98,7 +61,6 @@ namespace MertsToolBox
 
             RegisterBindings();
             MertToolState.OnToolAbortedByUI += HandleToolAbortedByUi;
-
         }
 
         /// <summary>
@@ -108,88 +70,158 @@ namespace MertsToolBox
         {
             base.OnUpdate();
 
-            UpdateToolBoxAllowedState();
             MertToolState.HasReleasedStaleObjectToolThisFrame = false;
-
-            UpdateActiveToolState();
-            UpdateCircleBindings();
-            UpdateHelixBindings();
-            UpdateSuperEllipseBindings();
-            UpdateGridBindings();
-            UpdateSharedSnapBindings();
-            UpdateSharedSubstractBinding();
-            UpdateActionHintBindings();
+            TryProcessPendingRestore();
         }
 
         /// <summary>
-        /// Cleans up event listeners to prevent memory leaks when the system is destroyed.
+        /// Cleans up event listeners and system references to prevent memory leaks upon destruction.
         /// </summary>
         [Preserve]
         protected override void OnDestroy()
         {
-            if (m_ToolSystem != null) m_ToolSystem.EventToolChanged -= OnToolChanged;
+            if (m_ToolSystem != null)
+            {
+                m_ToolSystem.EventToolChanged -= OnToolChanged;
+            }
             MertToolState.OnToolAbortedByUI -= HandleToolAbortedByUi;
+
+            m_ToolSystem = null;
+            m_CircleTool = null;
+            m_HelixTool = null;
+            m_SuperEllipseTool = null;
+            m_GridTool = null;
 
             base.OnDestroy();
         }
-
         #endregion
 
-        #region 6. BINDING REGISTRATION
-
+        #region UI Bindings Registration
         /// <summary>
         /// Registers all initial ValueBindings and TriggerBindings connecting the C# backend to the Cohtml/TSX frontend.
         /// </summary>
         private void RegisterBindings()
         {
-            // Global State
-            AddBinding(m_ActiveToolBinding = new ValueBinding<string>(ModId, "ActiveTool", "None"));
-            AddBinding(m_IsToolBoxAllowedBinding = new ValueBinding<bool>(ModId, "IsToolBoxAllowed", false));
+            AddUpdateBinding(new MertPolledBinding<string>(ModId, "ActiveTool", () =>
+            {
+                if (m_CircleTool != null && m_CircleTool.ToolEnabled) return "Circle";
+                if (m_HelixTool != null && m_HelixTool.ToolEnabled) return "Helix";
+                if (m_SuperEllipseTool != null && m_SuperEllipseTool.ToolEnabled) return "SuperEllipse";
+                if (m_GridTool != null && m_GridTool.ToolEnabled) return "Grid";
+                return "None";
+            }, "None"));
+
+            AddUpdateBinding(new MertPolledBinding<bool>(ModId, "IsToolBoxAllowed", () =>
+            {
+                bool prefabValid = m_CircleTool != null && m_CircleTool.IsCurrentPrefabValid();
+                bool toolContextValid = m_ToolSystem != null && (
+                    m_ToolSystem.activeTool is NetToolSystem ||
+                    (m_CircleTool != null && m_CircleTool.ToolEnabled) ||
+                    (m_HelixTool != null && m_HelixTool.ToolEnabled) ||
+                    (m_SuperEllipseTool != null && m_SuperEllipseTool.ToolEnabled) ||
+                    (m_GridTool != null && m_GridTool.ToolEnabled)
+                );
+                return prefabValid && toolContextValid;
+            }, false));
 
             // Circle Bindings
-            AddBinding(m_CircleDiameterBinding = new ValueBinding<float>(ModId, "CircleDiameter", 80f));
-            AddBinding(m_CircleDiameterStepIndexBinding = new ValueBinding<int>(ModId, "CircleDiameterStepIndex", 3));
-            AddBinding(m_CircleDiameterStepSizeBinding = new ValueBinding<int>(ModId, "CircleDiameterStepSize", 8));
+            AddUpdateBinding(new MertPolledBinding<float>(ModId, "CircleDiameter",
+                () => m_CircleTool != null ? m_CircleTool.GetCurrentDiameter() : 80f));
+            AddUpdateBinding(new MertPolledBinding<int>(ModId, "CircleDiameterStepIndex",
+                () => m_CircleTool != null ? m_CircleTool.GetCurrentDiameterStepIndex() : 3));
+            AddUpdateBinding(new MertPolledBinding<int>(ModId, "CircleDiameterStepSize",
+                () => m_CircleTool != null ? m_CircleTool.GetDiameterStepSize() : 8));
 
             // Helix Bindings
-            AddBinding(m_HelixDiameterBinding = new ValueBinding<float>(ModId, "HelixDiameter", 80f));
-            AddBinding(m_HelixDiameterStepIndexBinding = new ValueBinding<int>(ModId, "HelixDiameterStepIndex", 0));
-            AddBinding(m_HelixTurnsBinding = new ValueBinding<float>(ModId, "HelixTurns", 3f));
-            AddBinding(m_HelixTurnStepIndexBinding = new ValueBinding<int>(ModId, "HelixTurnStepIndex", 0));
-            AddBinding(m_HelixClearanceBinding = new ValueBinding<float>(ModId, "HelixClearance", 8f));
-            AddBinding(m_HelixClearanceStepIndexBinding = new ValueBinding<int>(ModId, "HelixClearanceStepIndex", 0));
+            AddUpdateBinding(new MertPolledBinding<float>(ModId, "HelixDiameter",
+                () => m_HelixTool != null ? m_HelixTool.GetCurrentDiameter() : 80f));
+            AddUpdateBinding(new MertPolledBinding<int>(ModId, "HelixDiameterStepIndex",
+                () => m_HelixTool != null ? m_HelixTool.GetCurrentDiameterStepIndex() : 0));
+            AddUpdateBinding(new MertPolledBinding<float>(ModId, "HelixTurns",
+                () => m_HelixTool != null ? m_HelixTool.GetCurrentTurns() : 3f));
+            AddUpdateBinding(new MertPolledBinding<int>(ModId, "HelixTurnStepIndex",
+                () => m_HelixTool != null ? m_HelixTool.GetCurrentTurnStepIndex() : 0));
+            AddUpdateBinding(new MertPolledBinding<float>(ModId, "HelixClearance",
+                () => m_HelixTool != null ? m_HelixTool.GetCurrentClearance() : 8f));
+            AddUpdateBinding(new MertPolledBinding<int>(ModId, "HelixClearanceStepIndex",
+                () => m_HelixTool != null ? m_HelixTool.GetCurrentClearanceStepIndex() : 0));
 
             // SuperEllipse Bindings
-            AddBinding(m_SuperEllipseWidthBinding = new ValueBinding<float>(ModId, "SuperEllipseWidth", 80f));
-            AddBinding(m_SuperEllipseWidthStepIndexBinding = new ValueBinding<int>(ModId, "SuperEllipseWidthStepIndex", 0));
-            AddBinding(m_SuperEllipseLengthBinding = new ValueBinding<float>(ModId, "SuperEllipseLength", 160f));
-            AddBinding(m_SuperEllipseLengthStepIndexBinding = new ValueBinding<int>(ModId, "SuperEllipseLengthStepIndex", 0));
-            AddBinding(m_SuperEllipseNBinding = new ValueBinding<float>(ModId, "SuperEllipseN", 8f));
+            AddUpdateBinding(new MertPolledBinding<float>(ModId, "SuperEllipseWidth",
+                () => m_SuperEllipseTool != null ? m_SuperEllipseTool.GetCurrentWidth() : 80f));
+            AddUpdateBinding(new MertPolledBinding<int>(ModId, "SuperEllipseWidthStepIndex",
+                () => m_SuperEllipseTool != null ? m_SuperEllipseTool.GetCurrentWidthStepIndex() : 0));
+            AddUpdateBinding(new MertPolledBinding<float>(ModId, "SuperEllipseLength",
+                () => m_SuperEllipseTool != null ? m_SuperEllipseTool.GetCurrentLength() : 160f));
+            AddUpdateBinding(new MertPolledBinding<int>(ModId, "SuperEllipseLengthStepIndex",
+                () => m_SuperEllipseTool != null ? m_SuperEllipseTool.GetCurrentLengthStepIndex() : 0));
+            AddUpdateBinding(new MertPolledBinding<float>(ModId, "SuperEllipseN",
+                () => m_SuperEllipseTool != null ? m_SuperEllipseTool.GetCurrentNSliderValue() : 8f));
 
             // Grid Bindings
-            AddBinding(m_GridBlockWidthBinding = new ValueBinding<int>(ModId, "GridBlockWidth", 12));
-            AddBinding(m_GridBlockLengthBinding = new ValueBinding<int>(ModId, "GridBlockLength", 12));
-            AddBinding(m_GridColumnsBinding = new ValueBinding<int>(ModId, "GridColumns", 2));
-            AddBinding(m_GridRowsBinding = new ValueBinding<int>(ModId, "GridRows", 2));
-            AddBinding(m_GridAlternatingBinding = new ValueBinding<bool>(ModId, "GridAlternating", false));
-            AddBinding(m_GridOrientationLeftBottomBinding = new ValueBinding<bool>(ModId, "GridOrientationLeftBottom", false));
-            AddBinding(m_GridIsOneWaySupportedBinding = new ValueBinding<bool>(ModId, "GridIsOneWaySupported", false));
+            AddUpdateBinding(new MertPolledBinding<int>(ModId, "GridBlockWidth",
+                () => m_GridTool != null ? m_GridTool.GetCurrentBlockWidthU() : 12));
+            AddUpdateBinding(new MertPolledBinding<int>(ModId, "GridBlockLength",
+                () => m_GridTool != null ? m_GridTool.GetCurrentBlockLengthU() : 12));
+            AddUpdateBinding(new MertPolledBinding<int>(ModId, "GridColumns",
+                () => m_GridTool != null ? m_GridTool.GetCurrentColumns() : 2));
+            AddUpdateBinding(new MertPolledBinding<int>(ModId, "GridRows",
+                () => m_GridTool != null ? m_GridTool.GetCurrentRows() : 2));
+            AddUpdateBinding(new MertPolledBinding<bool>(ModId, "GridAlternating",
+                () => m_GridTool != null && m_GridTool.GetIsAlternating()));
+            AddUpdateBinding(new MertPolledBinding<bool>(ModId, "GridOrientationLeftBottom",
+                () => m_GridTool != null && m_GridTool.GetIsOrientationLeftBottom()));
+            AddUpdateBinding(new MertPolledBinding<bool>(ModId, "GridIsOneWaySupported",
+                () => m_GridTool != null && m_GridTool.IsCurrentPrefabValidForOneWayPattern()));
 
             // Shared Snap & Toggle Bindings
-            AddBinding(m_IsSnapGeometryActiveBinding = new ValueBinding<bool>(ModId, "IsSnapGeometryActive", false));
-            AddBinding(m_IsSnapNetSideActiveBinding = new ValueBinding<bool>(ModId, "IsSnapNetSideActive", false));
-            AddBinding(m_IsSnapNetAreaActiveBinding = new ValueBinding<bool>(ModId, "IsSnapNetAreaActive", false));
-            AddBinding(m_IsSubstractActiveBinding = new ValueBinding<bool>(ModId, "IsSubstractActive", false));
+            AddUpdateBinding(new MertPolledBinding<bool>(ModId, "ShowSnapRow", () =>
+            {
+                if (m_GridTool != null && m_GridTool.ToolEnabled)
+                    return Mod.settings != null && Mod.settings.EnableGridSnap;
+
+                if (m_HelixTool != null && m_HelixTool.ToolEnabled)
+                    return Mod.settings != null && Mod.settings.EnableHelixSnap;
+                return true;
+            }));
+
+            AddUpdateBinding(new MertPolledBinding<bool>(ModId, "IsSnapGeometryActive", () => {
+                if (m_CircleTool != null && m_CircleTool.ToolEnabled) return m_CircleTool.IsSnapGeometryEnabled();
+                if (m_HelixTool != null && m_HelixTool.ToolEnabled) return m_HelixTool.IsSnapGeometryEnabled();
+                if (m_SuperEllipseTool != null && m_SuperEllipseTool.ToolEnabled) return m_SuperEllipseTool.IsSnapGeometryEnabled();
+                if (m_GridTool != null && m_GridTool.ToolEnabled) return m_GridTool.IsSnapGeometryEnabled();
+                return false;
+            }));
+            AddUpdateBinding(new MertPolledBinding<bool>(ModId, "IsSnapNetSideActive", () => {
+                if (m_CircleTool != null && m_CircleTool.ToolEnabled) return m_CircleTool.IsSnapNetSideEnabled();
+                if (m_HelixTool != null && m_HelixTool.ToolEnabled) return m_HelixTool.IsSnapNetSideEnabled();
+                if (m_SuperEllipseTool != null && m_SuperEllipseTool.ToolEnabled) return m_SuperEllipseTool.IsSnapNetSideEnabled();
+                if (m_GridTool != null && m_GridTool.ToolEnabled) return m_GridTool.IsSnapNetSideEnabled();
+                return false;
+            }));
+            AddUpdateBinding(new MertPolledBinding<bool>(ModId, "IsSnapNetAreaActive", () =>
+            {
+                if (m_CircleTool != null && m_CircleTool.ToolEnabled) return m_CircleTool.IsSnapNetAreaEnabled();
+                if (m_HelixTool != null && m_HelixTool.ToolEnabled) return m_HelixTool.IsSnapNetAreaEnabled();
+                if (m_SuperEllipseTool != null && m_SuperEllipseTool.ToolEnabled) return m_SuperEllipseTool.IsSnapNetAreaEnabled();
+                if (m_GridTool != null && m_GridTool.ToolEnabled) return m_GridTool.IsSnapNetAreaEnabled();
+                return false;
+            }));
 
             // Action Hints
-            AddBinding(m_ShowCircleCtrlWheelHintBinding = new ValueBinding<bool>(ModId, "ShowCircleCtrlWheelHint", false));
-            AddBinding(m_ShowHelixCtrlWheelHintBinding = new ValueBinding<bool>(ModId, "ShowHelixCtrlWheelHint", false));
-            AddBinding(m_ShowSuperEllipseCtrlWheelHintBinding = new ValueBinding<bool>(ModId, "ShowSuperEllipseCtrlWheelHint", false));
-            AddBinding(m_ActionStatusTextBinding = new ValueBinding<string>(ModId, "ActionStatusText", ""));
+            AddUpdateBinding(new MertPolledBinding<bool>(ModId, "ShowCircleCtrlWheelHint",
+                () => Mod.settings != null && Mod.settings.UseCtrlWheelForCircleDiameterAdjustment));
+            AddUpdateBinding(new MertPolledBinding<bool>(ModId, "ShowHelixCtrlWheelHint",
+                () => Mod.settings != null && Mod.settings.UseCtrlWheelForHelixTurnAdjustment));
+            AddUpdateBinding(new MertPolledBinding<bool>(ModId, "ShowSuperEllipseCtrlWheelHint",
+                () => Mod.settings != null && Mod.settings.UseCtrlWheelForShapeAdjustment));
 
+            AddUpdateBinding(new MertPolledBinding<string>(ModId, "ActionStatusText",
+                () => GetActionStatusText(), ""));
 
             // Global Triggers
-            AddBinding(new TriggerBinding<string>(ModId, "ToggleTool", (toolName) => {
+            AddBinding(new TriggerBinding<string>(ModId, "ToggleTool", (toolName) =>
+            {
                 MertToolState.UserJustChangedAssetCategory = false;
                 CloseTools(ToolExitMode.UserSelectionClose);
 
@@ -197,18 +229,13 @@ namespace MertsToolBox
                 else if (toolName == "Helix") m_HelixTool?.SetToolState(true);
                 else if (toolName == "SuperEllipse") m_SuperEllipseTool?.SetToolState(true);
                 else if (toolName == "Grid") m_GridTool?.SetToolState(true);
-
-                UpdateActiveToolState();
             }));
-
-            AddBinding(new TriggerBinding(ModId, "UiInteracted", new Action(OnUiInteractedTriggered)));
 
             // Circle Triggers
             AddBinding(new TriggerBinding(ModId, "CircleDiameterUp", () => m_CircleTool?.QueueDiameterChange(+1)));
             AddBinding(new TriggerBinding(ModId, "CircleDiameterDown", () => m_CircleTool?.QueueDiameterChange(-1)));
             AddBinding(new TriggerBinding(ModId, "CircleDiameterStep", () => m_CircleTool?.QueueDiameterStepCycle()));
             AddBinding(new TriggerBinding<string>(ModId, "ToggleCircleSnap", (snapType) => m_CircleTool?.QueueSnapToggle(snapType)));
-            AddBinding(new TriggerBinding(ModId, "ToggleCircleSubstract", () => m_CircleTool?.QueueSubstractToggle()));
 
             // Helix Triggers
             AddBinding(new TriggerBinding(ModId, "HelixDiameterUp", () => m_HelixTool?.QueueDiameterChange(+1)));
@@ -231,7 +258,6 @@ namespace MertsToolBox
             AddBinding(new TriggerBinding(ModId, "SuperEllipseLengthStep", () => m_SuperEllipseTool?.QueueLengthStepCycle()));
             AddBinding(new TriggerBinding<float>(ModId, "SuperEllipseSetN", (value) => m_SuperEllipseTool?.SetNFromUi(value)));
             AddBinding(new TriggerBinding<string>(ModId, "SuperEllipseToggleSnap", (snapType) => m_SuperEllipseTool?.QueueSnapToggle(snapType)));
-            AddBinding(new TriggerBinding(ModId, "ToggleEllipseSubstract", () => m_SuperEllipseTool?.QueueSubstractToggle()));
 
             // Grid Triggers
             AddBinding(new TriggerBinding(ModId, "GridBlockWidthUp", () => m_GridTool?.QueueBlockWidthChange(+1)));
@@ -246,212 +272,11 @@ namespace MertsToolBox
             AddBinding(new TriggerBinding(ModId, "GridToggleOrientation", () => m_GridTool?.QueueToggleOrientation()));
             AddBinding(new TriggerBinding<string>(ModId, "GridToggleSnap", (snapType) => m_GridTool?.QueueSnapToggle(snapType)));
         }
-
         #endregion
 
-        #region 7. BINDING UPDATES (STATE SYNC)
-
+        #region Tool Event Handling
         /// <summary>
-        /// Synchronizes the internal C# state of the Circle Tool with the frontend UI bindings.
-        /// </summary>
-        private void UpdateCircleBindings()
-        {
-            if (m_CircleTool == null) return;
-
-            m_CircleDiameterBinding.Update(m_CircleTool.GetCurrentDiameter());
-            m_CircleDiameterStepIndexBinding.Update(m_CircleTool.GetCurrentDiameterStepIndex());
-            m_CircleDiameterStepSizeBinding.Update(m_CircleTool.GetDiameterStepSize());
-        }
-
-        /// <summary>
-        /// Synchronizes the internal C# state of the Helix Tool with the frontend UI bindings.
-        /// </summary>
-        private void UpdateHelixBindings()
-        {
-            if (m_HelixTool == null) return;
-
-            m_HelixDiameterBinding.Update(m_HelixTool.GetCurrentDiameter());
-            m_HelixDiameterStepIndexBinding.Update(m_HelixTool.GetCurrentDiameterStepIndex());
-            m_HelixTurnsBinding.Update(m_HelixTool.GetCurrentTurns());
-            m_HelixTurnStepIndexBinding.Update(m_HelixTool.GetCurrentTurnStepIndex());
-            m_HelixClearanceBinding.Update(m_HelixTool.GetCurrentClearance());
-            m_HelixClearanceStepIndexBinding.Update(m_HelixTool.GetCurrentClearanceStepIndex());
-        }
-
-        /// <summary>
-        /// Synchronizes the internal C# state of the SuperEllipse Tool with the frontend UI bindings.
-        /// </summary>
-        private void UpdateSuperEllipseBindings()
-        {
-            if (m_SuperEllipseTool == null) return;
-
-            m_SuperEllipseWidthBinding.Update(m_SuperEllipseTool.GetCurrentWidth());
-            m_SuperEllipseWidthStepIndexBinding.Update(m_SuperEllipseTool.GetCurrentWidthStepIndex());
-            m_SuperEllipseLengthBinding.Update(m_SuperEllipseTool.GetCurrentLength());
-            m_SuperEllipseLengthStepIndexBinding.Update(m_SuperEllipseTool.GetCurrentLengthStepIndex());
-            m_SuperEllipseNBinding.Update(m_SuperEllipseTool.GetCurrentNSliderValue());
-        }
-
-        /// <summary>
-        /// Synchronizes the internal C# state of the Grid Tool with the frontend UI bindings.
-        /// </summary>
-        private void UpdateGridBindings()
-        {
-            if (m_GridTool == null) return;
-
-            m_GridBlockWidthBinding.Update(m_GridTool.GetCurrentBlockWidthU());
-            m_GridBlockLengthBinding.Update(m_GridTool.GetCurrentBlockLengthU());
-            m_GridColumnsBinding.Update(m_GridTool.GetCurrentColumns());
-            m_GridRowsBinding.Update(m_GridTool.GetCurrentRows());
-            m_GridAlternatingBinding.Update(m_GridTool.GetIsAlternating());
-            m_GridOrientationLeftBottomBinding.Update(m_GridTool.GetIsOrientationLeftBottom());
-            m_GridIsOneWaySupportedBinding.Update(m_GridTool.IsCurrentPrefabValidForOneWayPattern());
-        }
-        private void UpdateSharedSnapBindings()
-        {
-            MertBaseToolSystem activeTool = null;
-
-            if (m_CircleTool != null && m_CircleTool.ToolEnabled)
-                activeTool = m_CircleTool;
-            else if (m_HelixTool != null && m_HelixTool.ToolEnabled)
-                activeTool = m_HelixTool;
-            else if (m_SuperEllipseTool != null && m_SuperEllipseTool.ToolEnabled)
-                activeTool = m_SuperEllipseTool;
-            else if (m_GridTool != null && m_GridTool.ToolEnabled)
-                activeTool = m_GridTool;
-
-            if (activeTool != null)
-            {
-                m_IsSnapGeometryActiveBinding.Update(activeTool.IsSnapGeometryEnabled());
-                m_IsSnapNetSideActiveBinding.Update(activeTool.IsSnapNetSideEnabled());
-                m_IsSnapNetAreaActiveBinding.Update(activeTool.IsSnapNetAreaEnabled());
-            }
-            else
-            {
-                m_IsSnapGeometryActiveBinding.Update(false);
-                m_IsSnapNetSideActiveBinding.Update(false);
-                m_IsSnapNetAreaActiveBinding.Update(false);
-            }
-        }
-        /// <summary>
-        /// Synchronizes the Ctrl+Mouse Wheel control state of the Grid Tool with the frontend UI bindings.
-        /// </summary>
-        private void UpdateActionHintBindings()
-        {
-            bool showCircleCtrlWheel = Mod.settings != null && Mod.settings.UseCtrlWheelForCircleDiameterAdjustment;
-            bool showHelixCtrlWheel = Mod.settings != null && Mod.settings.UseCtrlWheelForHelixTurnAdjustment;
-            bool showSuperEllipseCtrlWheel = Mod.settings != null && Mod.settings.UseCtrlWheelForShapeAdjustment;
-
-            m_ShowCircleCtrlWheelHintBinding.Update(showCircleCtrlWheel);
-            m_ShowHelixCtrlWheelHintBinding.Update(showHelixCtrlWheel);
-            m_ShowSuperEllipseCtrlWheelHintBinding.Update(showSuperEllipseCtrlWheel);
-
-            string statusText = string.Empty;
-
-            string activeTool = "None";
-            if (m_CircleTool != null && m_CircleTool.ToolEnabled) activeTool = "Circle";
-            else if (m_HelixTool != null && m_HelixTool.ToolEnabled) activeTool = "Helix";
-            else if (m_SuperEllipseTool != null && m_SuperEllipseTool.ToolEnabled) activeTool = "SuperEllipse";
-            else if (m_GridTool != null && m_GridTool.ToolEnabled) activeTool = "Grid";
-
-            switch (activeTool)
-            {
-                case "Circle":
-                    if (m_CircleTool != null)
-                    {
-                        CircleMetrics m = m_CircleTool.GetCurrentCircleMetrics();
-                        statusText =
-                            $"Outer: {FormatSmart(m.OuterDiameterUnits)}U ({FormatSmart(m.OuterDiameterMeters)}m) - " +
-                            $"Inner: {FormatSmart(m.InnerDiameterUnits)}U ({FormatSmart(m.InnerDiameterMeters)}m)";
-                    }
-                    break;
-
-                case "Helix":
-                    if (m_HelixTool != null)
-                    {
-                        statusText =
-                            $"Diameter: {FormatSmart(m_HelixTool.GetCurrentDiameter())}m - " +
-                            $"Turns: {FormatSmart(m_HelixTool.GetCurrentTurns())} - " +
-                            $"Clearance: {FormatSmart(m_HelixTool.GetCurrentClearance())}m";
-                    }
-                    break;
-
-                case "SuperEllipse":
-                    if (m_SuperEllipseTool != null)
-                    {
-                        statusText =
-                            $"Width: {FormatSmart(m_SuperEllipseTool.GetCurrentWidth())}m - " +
-                            $"Length: {FormatSmart(m_SuperEllipseTool.GetCurrentLength())}m - " +
-                            $"N: {FormatSmart(m_SuperEllipseTool.GetCurrentNSliderValue())}";
-                    }
-                    break;
-
-                case "Grid":
-                    if (m_GridTool != null)
-                    {
-                        statusText =
-                            $"Width: {FormatSmart(m_GridTool.GetCurrentBlockWidthU())}U - " +
-                            $"Length: {FormatSmart(m_GridTool.GetCurrentBlockLengthU())}U - " +
-                            $"Rows: {FormatSmart(m_GridTool.GetCurrentRows())} - " +
-                            $"Columns: {FormatSmart(m_GridTool.GetCurrentColumns())}";
-                    }
-                    break;
-            }
-
-            m_ActionStatusTextBinding.Update(statusText);
-        }
-
-        /// <summary>
-        /// Determines which tool is currently active and updates the active tool binding string for the UI.
-        /// </summary>
-        private void UpdateActiveToolState()
-        {
-            if (MertToolState.SuppressUiAbortDuringRestore) return;
-
-            string current = "None";
-            if (m_CircleTool != null && m_CircleTool.ToolEnabled) current = "Circle";
-            else if (m_HelixTool != null && m_HelixTool.ToolEnabled) current = "Helix";
-            else if (m_SuperEllipseTool != null && m_SuperEllipseTool.ToolEnabled) current = "SuperEllipse";
-            else if (m_GridTool != null && m_GridTool.ToolEnabled) current = "Grid";
-
-            m_ActiveToolBinding.Update(current);
-        }
-
-        /// <summary>
-        /// Evaluates if the toolbox UI should be allowed to render based on the validity of the currently selected prefab.
-        /// </summary>
-        private void UpdateToolBoxAllowedState()
-        {
-            bool prefabValid = m_CircleTool != null && m_CircleTool.IsCurrentPrefabValid();
-
-            bool toolContextValid =
-                m_ToolSystem != null &&
-                (
-                    m_ToolSystem.activeTool is NetToolSystem ||
-                    (m_CircleTool != null && m_CircleTool.ToolEnabled) ||
-                    (m_HelixTool != null && m_HelixTool.ToolEnabled) ||
-                    (m_SuperEllipseTool != null && m_SuperEllipseTool.ToolEnabled) ||
-                    (m_GridTool != null && m_GridTool.ToolEnabled)
-                );
-
-            bool isAllowed = prefabValid && toolContextValid;
-            m_IsToolBoxAllowedBinding.Update(isAllowed);
-        }
-
-        #endregion
-
-        #region 8. EVENT HANDLERS & TOOL MANAGEMENT
-
-        /// <summary>
-        /// Logs the exact timestamp of the last direct interaction with the UI, used for focus management.
-        /// </summary>
-        private void OnUiInteractedTriggered()
-        {
-            m_LastUiInteractionTime = DateTime.UtcNow;
-        }
-
-        /// <summary>
-        /// Handles forceful abort requests originating from the UI system.
+        /// Handles forceful tool abort requests originating from the UI system.
         /// </summary>
         private void HandleToolAbortedByUi(ToolExitMode exitMode)
         {
@@ -460,7 +285,7 @@ namespace MertsToolBox
         }
 
         /// <summary>
-        /// Disables all custom tools securely based on the provided exit mode and resets the active tool binding.
+        /// Disables all custom tools securely based on the provided exit mode.
         /// </summary>
         private void CloseTools(ToolExitMode exitMode)
         {
@@ -468,18 +293,17 @@ namespace MertsToolBox
             m_HelixTool?.RequestDisable(exitMode);
             m_SuperEllipseTool?.RequestDisable(exitMode);
             m_GridTool?.RequestDisable(exitMode);
-
-            m_ActiveToolBinding.Update("None");
-            UpdateActiveToolState();
         }
 
         /// <summary>
-        /// Listens to global tool changes and safely closes custom tools if standard game tools (like the Default Tool or an unsupported type) take over.
-        /// Handles escape key closures and asset category switching.
+        /// Listens to global tool changes and safely closes custom tools if standard game tools take over.
         /// </summary>
         private void OnToolChanged(ToolBaseSystem tool)
         {
-            if (MertToolState.SuppressUiAbortDuringRestore) return;
+            if (MertToolState.SuppressToolChangedDuringColdstart)
+                return;
+            if (MertToolState.SuppressUiAbortDuringRestore)
+                return;
 
             var objectTool = World.GetOrCreateSystemManaged<ObjectToolSystem>();
             var netTool = World.GetOrCreateSystemManaged<NetToolSystem>();
@@ -487,15 +311,20 @@ namespace MertsToolBox
 
             if (tool == defaultTool)
             {
-                if (MertToolState.UserJustChangedAssetCategory) return;
+                if (MertToolState.UserJustChangedAssetCategory)
+                    return;
 
                 CloseTools(ToolExitMode.RestoreFromEscape);
                 return;
             }
 
-            if (MertToolState.UserJustChangedAssetCategory)
+            if (tool == netTool)
             {
-                if (tool is NetToolSystem) MertToolState.UserJustChangedAssetCategory = false;
+                if (MertToolState.UserJustChangedAssetCategory)
+                {
+                    MertToolState.UserJustChangedAssetCategory = false;
+                    return;
+                }
                 return;
             }
 
@@ -504,31 +333,132 @@ namespace MertsToolBox
                 CloseTools(ToolExitMode.UserSelectionClose);
             }
         }
-
         #endregion
 
-        #region 9. HELPERS
-        private void UpdateSharedSubstractBinding()
+        #region Handoff & Restore
+        /// <summary>
+        /// Processes any pending restore operations to re-establish previous tool states and selections.
+        /// </summary>
+        private void TryProcessPendingRestore()
         {
-            bool isSubstractActive = false;
+            if (!MertToolState.PendingRestore)
+                return;
 
-            if (m_CircleTool != null && m_CircleTool.ToolEnabled)
-                isSubstractActive = m_CircleTool.IsSubstractEnabled();
-            else if (m_SuperEllipseTool != null && m_SuperEllipseTool.ToolEnabled)
-                isSubstractActive = m_SuperEllipseTool.IsSubstractEnabled();
+            if (MertToolState.PendingRestoreMode == ToolExitMode.None)
+            {
+                MertToolState.ClearPendingRestore();
+                return;
+            }
+            if (m_ToolSystem == null)
+                return;
 
-            m_IsSubstractActiveBinding.Update(isSubstractActive);
+            NetPrefab road = MertToolState.PendingRestoreRoad;
+            Entity category = MertToolState.PendingRestoreCategory;
+            ToolExitMode mode = MertToolState.PendingRestoreMode;
+
+            var toolbarUISystem = World.GetExistingSystemManaged<Game.UI.InGame.ToolbarUISystem>();
+            var prefabSystem = World.GetExistingSystemManaged<PrefabSystem>();
+            var netTool = World.GetOrCreateSystemManaged<NetToolSystem>();
+
+            if (toolbarUISystem == null || prefabSystem == null || netTool == null)
+                return;
+
+            MertToolState.SuppressUiAbortDuringRestore = true;
+            MertToolState.SuppressLiveUiCapture = true;
+            MertToolState.SuppressUiMemoryCapture = true;
+            MertToolState.SuppressCategoryCapture = true;
+
+            try
+            {
+                var flags = System.Reflection.BindingFlags.Instance |
+                            System.Reflection.BindingFlags.NonPublic |
+                            System.Reflection.BindingFlags.Public;
+
+                if (category != Entity.Null)
+                {
+                    var selectCategory = toolbarUISystem.GetType()
+                        .GetMethod("SelectAssetCategory", flags, null, new Type[] { typeof(Entity) }, null);
+                    selectCategory?.Invoke(toolbarUISystem, new object[] { category });
+                }
+
+                if (road != null)
+                {
+                    Entity roadEntity = prefabSystem.GetEntity(road);
+                    if (roadEntity != Entity.Null)
+                    {
+                        var selectAsset = toolbarUISystem.GetType()
+                            .GetMethod("SelectAsset", flags, null, new Type[] { typeof(Entity), typeof(bool) }, null);
+                        selectAsset?.Invoke(toolbarUISystem, new object[] { roadEntity, true });
+                    }
+                }
+
+                m_ToolSystem.activeTool = netTool;
+
+                if (road != null)
+                {
+                    m_ToolSystem.ActivatePrefabTool(road);
+                }
+            }
+            finally
+            {
+                MertToolState.SuppressCategoryCapture = false;
+                MertToolState.SuppressUiMemoryCapture = false;
+                MertToolState.SuppressLiveUiCapture = false;
+                MertToolState.SuppressUiAbortDuringRestore = false;
+                MertToolState.ClearPendingRestore();
+            }
         }
+        #endregion
+
+        #region UI Formatting Utilities
+        /// <summary>
+        /// Generates the formatted status text displaying current metrics for the active tool.
+        /// </summary>
+        private string GetActionStatusText()
+        {
+            if (m_CircleTool != null && m_CircleTool.ToolEnabled)
+            {
+                CircleMetrics m = m_CircleTool.GetCurrentCircleMetrics();
+                return $"Outer: {FormatSmart(m.OuterDiameterUnits)}U ({FormatSmart(m.OuterDiameterMeters)}m) - " +
+                       $"Inner: {FormatSmart(m.InnerDiameterUnits)}U ({FormatSmart(m.InnerDiameterMeters)}m)";
+            }
+            if (m_HelixTool != null && m_HelixTool.ToolEnabled)
+            {
+                return $"Diameter: {FormatSmart(m_HelixTool.GetCurrentDiameter())}m - " +
+                       $"Turns: {FormatSmart(m_HelixTool.GetCurrentTurns())} - " +
+                       $"Clearance: {FormatSmart(m_HelixTool.GetCurrentClearance())}m";
+            }
+            if (m_SuperEllipseTool != null && m_SuperEllipseTool.ToolEnabled)
+            {
+                return $"Width: {FormatSmart(m_SuperEllipseTool.GetCurrentWidth())}m - " +
+                       $"Length: {FormatSmart(m_SuperEllipseTool.GetCurrentLength())}m - " +
+                       $"N: {FormatSmart(m_SuperEllipseTool.GetCurrentNSliderValue())}";
+            }
+            if (m_GridTool != null && m_GridTool.ToolEnabled)
+            {
+                return $"Width: {FormatSmart(m_GridTool.GetCurrentBlockWidthU())}U - " +
+                       $"Length: {FormatSmart(m_GridTool.GetCurrentBlockLengthU())}U - " +
+                       $"Rows: {FormatSmart(m_GridTool.GetCurrentRows())} - " +
+                       $"Columns: {FormatSmart(m_GridTool.GetCurrentColumns())}";
+            }
+            return string.Empty;
+        }
+
+        /// <summary>
+        /// Formats a floating-point value to a concise string representation.
+        /// </summary>
         private static string FormatSmart(float value)
         {
             return value.ToString("0.##", CultureInfo.InvariantCulture);
         }
 
+        /// <summary>
+        /// Formats an integer value to a string representation.
+        /// </summary>
         private static string FormatSmart(int value)
         {
             return value.ToString(CultureInfo.InvariantCulture);
         }
-
         #endregion
     }
 }

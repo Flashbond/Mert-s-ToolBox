@@ -2,347 +2,238 @@ using Colossal.Entities;
 using Game;
 using Game.Prefabs;
 using Game.Tools;
-using System;
 using Unity.Entities;
 using Unity.Mathematics;
-using UnityEngine.InputSystem;
 
 namespace MertsToolBox
 {
     public abstract partial class MertBaseToolSystem : GameSystemBase
     {
-        #region 1. SYSTEM REFERENCES
-
+        #region Fields & Properties
         protected ToolSystem m_ToolSystem;
-        protected NetToolSystem m_NetToolSystem;
         protected ObjectToolSystem m_ObjectToolSystem;
+        protected NetToolSystem m_NetToolSystem;
         protected PrefabSystem m_PrefabSystem;
         protected ToolRaycastSystem m_ToolRaycastSystem;
 
-        #endregion
-
-        #region 2. TOOL STATE
-
-        public bool ToolEnabled { get; private set; }
-
-        protected virtual bool RequiresSnapEnforcement => false;
-        protected virtual bool AllowOverlapPlacement => false;
-
-        protected double RealtimeNow => UnityEngine.Time.realtimeSinceStartupAsDouble;
-
-        #endregion
-
-        #region 3. CREATE / REBUILD PIPELINE
-
-        protected bool m_PendingCreateShape;
-        protected bool m_PreviewRebuildQueued;
-        protected double m_PreviewRebuildAt;
-        protected const double PreviewRebuildDelay = 0.04;
-
-        private bool m_ExecuteCreateShape;
-        private bool m_IsCreatingShape;
-        private double m_LastCreateTime;
-
-        #endregion
-
-        #region 4. HANDOFF / WARMUP
-
-        private bool m_PendingObjectToolHandoff;
-        private AssetStampPrefab m_PendingHandoffStamp;
-        private double m_PendingHandoffTimeoutAt;
- 
-        #endregion
-
-        #region 5. RUNTIME STAMP
+        protected static AssetStampPrefab s_SharedRuntimeStamp;
+        protected static Entity s_SharedRuntimeStampEntity;
+        protected static bool s_SharedStampRegistered;
+        protected static bool s_PrebakeCompleted;
+        protected static bool s_ObjectToolFoundationWarmed;
 
         protected AssetStampPrefab m_RuntimeStamp;
         public Entity RuntimeStampEntity { get; protected set; }
-        protected bool m_RuntimeStampCreated;
+
         protected NetPrefab m_LastUsedRoadPrefab;
+        private AssetStampPrefab m_PendingHandoffStamp;
+        protected double m_SuppressPlacementUntil;
 
+        public bool ToolEnabled { get; protected set; }
+
+        /// <summary>
+        /// Indicates whether overlapping placement is permitted for the active tool.
+        /// </summary>
+        protected virtual bool AllowOverlapPlacement => false;
+
+        /// <summary>
+        /// Indicates whether this tool overrides global snap settings.
+        /// </summary>
+        protected virtual bool RequiresSnapEnforcement => false;
+
+        protected bool m_PendingCreateShape;
+        private bool m_IsCreatingShape;
+        private bool m_PendingObjectToolHandoff;
+
+        /// <summary>
+        /// Provides the current real-time since startup as a double precision value.
+        /// </summary>
+        protected double RealtimeNow => UnityEngine.Time.realtimeSinceStartupAsDouble;
+
+        protected bool m_ContextRecipeReady;
+        protected bool m_ContextUsesRoadNode = false;
+
+        protected Game.Objects.PlacementFlags m_DesiredPlacementFlags =
+                    Game.Objects.PlacementFlags.OnGround |
+                    Game.Objects.PlacementFlags.RoadEdge |
+                    Game.Objects.PlacementFlags.RoadSide;
         #endregion
 
-        #region 6. COST ENGINE STATE
-
-        protected bool m_PendingCostResolve;
-        protected int m_CostResolveRetries;
-        protected AssetStampPrefab m_PendingCostStamp;
-        protected ObjectSubNetInfo[] m_PendingCostSubNets;
-        protected NetPrefab m_PendingCostRoadPrefab;
-        protected float m_PendingCostHighestElevation;
-
-        #endregion
-
-        #region 7. SNAP STATE
-
-        protected bool m_HasStoredSnapMask;
-        protected Snap m_StoredSnapMask;
-
-        protected bool m_SnapGeometryEnabled = true;
-        protected bool m_SnapNetSideEnabled = false;
-        protected bool m_SnapNetAreaEnabled = true;
-        protected bool m_RoadSnapEnabled = true;
-
-        #endregion
-
-        #region 8. SESSION / EXIT / PLACEMENT
-
-        protected ToolExitMode m_PendingExitMode = ToolExitMode.None;
-        protected NetPrefab m_SessionRoadPrefab;
-        protected NetPrefab m_PendingExitRoadPrefab;
-
-        protected bool m_PendingDisableAfterPlacement;
-        protected double m_PostPlaceDisableAt;
-        protected double m_SuppressAutoDisableUntil;
-
-        #endregion
-
-        #region 9. INPUT
-
-        private UnityEngine.InputSystem.InputAction m_CancelAction;
-        protected float m_InputCooldown = 0f;
-
-        #endregion   
-
-        #region 10. ABSTRACT / VIRTUAL CONTRACTS
-
+        #region Abstract Core
+        /// <summary>
+        /// Gets the specific name of the tool system.
+        /// </summary>
         protected abstract string GetToolName();
-        protected abstract void ProcessToolInput();
-        protected abstract bool TryMutateTargetStamp();
 
-        protected virtual void OnToolActivated() { }
-        protected virtual void OnToolDeactivated() { }
-        protected virtual void OnToolTick() { }
+        /// <summary>
+        /// Processes custom inputs specific to the active tool implementation.
+        /// </summary>
+        protected abstract void ProcessToolInput();
+
+        /// <summary>
+        /// Attempts to generate the mathematical sub-networks and cells for the selected road prefab.
+        /// </summary>
+        protected abstract bool TryGenerateGeometry(NetPrefab roadPrefab, out ObjectSubNetInfo[] subNets, out int widthCells, out int depthCells, out float costElevation);
+
+        /// <summary>
+        /// Triggered when the generated shape has been successfully placed in the game world.
+        /// </summary>
         protected virtual void OnShapePlaced() { }
 
+        /// <summary>
+        /// Triggered when the custom tool is activated and becomes the primary selection.
+        /// </summary>
+        protected virtual void OnToolActivated() { }
+
+        /// <summary>
+        /// Triggered when the custom tool is deactivated or replaced by another tool.
+        /// </summary>
+        protected virtual void OnToolDeactivated() { }
         #endregion
- 
 
-        #region 11. ECS LIFECYCLE
-
-        /// <summary>Initializes system references and sets up input bindings when the system is created.</summary>
+        #region Lifecycle & Updates
+        /// <summary>
+        /// Initializes system references and binds event listeners when the system is created.
+        /// </summary>
         protected override void OnCreate()
         {
             base.OnCreate();
-
             m_ToolSystem = World.GetOrCreateSystemManaged<ToolSystem>();
             m_ObjectToolSystem = World.GetOrCreateSystemManaged<ObjectToolSystem>();
             m_NetToolSystem = World.GetOrCreateSystemManaged<NetToolSystem>();
             m_PrefabSystem = World.GetOrCreateSystemManaged<PrefabSystem>();
             m_ToolRaycastSystem = World.GetOrCreateSystemManaged<ToolRaycastSystem>();
 
-            m_CancelAction = new UnityEngine.InputSystem.InputAction("MertsToolBoxCancel");
-            m_CancelAction.AddBinding("<Keyboard>/escape");
-            m_CancelAction.Enable();
+            Settings.OnOptionsChanged += OnSettingsChanged;
+            PrebakeRuntimeStamp();
         }
 
-        /// <summary>Main update loop that processes tool transitions, inputs, shape generation, and rendering handoffs.</summary>
+        /// <summary>
+        /// Executes the main logic loop including input processing, prebaking, and shape handoffs.
+        /// </summary>
         protected override void OnUpdate()
         {
-            if (m_PendingExitMode == ToolExitMode.RestoreFromEscape)
-            {
-                if (m_ToolSystem.activeTool != m_ObjectToolSystem)
-                {
-                    if (m_PendingExitRoadPrefab != null)
-                    {
-                        ForceUpdateUIAndTool(m_PendingExitRoadPrefab, updateTool: true, selectCategory: true);
-                    }
-
-                    m_PendingExitMode = ToolExitMode.None;
-                    m_PendingExitRoadPrefab = null;
-                    MertToolState.SuppressUiAbortDuringRestore = false;
-                }
-                return;
-            }
-
+            if (!s_PrebakeCompleted)
+                TryLatePrebakeWithRealRoad();
             if (!ToolEnabled)
                 return;
-
-            if (HandleEscapeExit())
-                return;
-
-            if (HandleDeferredDisable())
-                return;
-
-            if (HandlePendingObjectToolHandoff())
-                return;
-
             ProcessToolInput();
+            CheckExitAndPlacementInputs();
+
+            if (m_PendingObjectToolHandoff && HandlePendingObjectToolHandoff())
+                return;
 
             if (m_PendingCreateShape)
-            {
-                m_PendingCreateShape = false;
-                QueuePreviewRebuild();
-            }
-
-            UpdateQueuedPreviewRebuild();
-
-            HandleExecuteCreateShape();
-            HandlePendingCostResolve();
-
-            if (RequiresSnapEnforcement)
-            {
-                EnforceRuntimeStampSnapMetadata();
-            }
-
-            OnToolTick();
+                HandleExecuteCreateShape();
         }
 
-        /// <summary>Cleans up input actions and disposes of resources when the system is destroyed.</summary>
+        /// <summary>
+        /// Cleans up memory allocations and unbinds event listeners when the system is destroyed.
+        /// </summary>
         protected override void OnDestroy()
         {
-            m_CancelAction?.Disable();
-            m_CancelAction?.Dispose();
+            Settings.OnOptionsChanged -= OnSettingsChanged;
+            if (s_SharedRuntimeStamp != null)
+            {
+                UnityEngine.Object.Destroy(s_SharedRuntimeStamp);
+                s_SharedRuntimeStamp = null;
+            }
+            s_SharedStampRegistered = false;
+            s_PrebakeCompleted = false;
+            s_ObjectToolFoundationWarmed = false;
+            m_ToolSystem = null;
+            m_ObjectToolSystem = null;
+            m_NetToolSystem = null;
+            m_PrefabSystem = null;
+            m_ToolRaycastSystem = null;
+            m_RuntimeStamp = null;
+
             base.OnDestroy();
         }
 
-        #endregion
-
-        #region 12. TOOL STATE MANAGEMENT
-
-        /// <summary>Activates or deactivates the tool mode, capturing current prefabs and snap states when enabling.</summary>
-        public void SetToolState(bool isEnabled)
+        /// <summary>
+        /// Handles dynamic updates to the tool state when user settings are modified.
+        /// </summary>
+        private void OnSettingsChanged()
         {
-            if (ToolEnabled == isEnabled)
-                return;
-         
-            if (!isEnabled)
-            {
-                DisableToolMode(ToolExitMode.SilentTabClose);
-                return;
-            }
+            if (!ToolEnabled) return;
 
-            var currentRoad = TryGetCurrentSelectedRoadPrefab();
-
-            if (MertToolState.BlockRoadPrefabFallbackUntilNextRealSelection)
-                m_SessionRoadPrefab = currentRoad;
-            else
-                m_SessionRoadPrefab = currentRoad ?? MertToolState.LastResolvedRoadPrefab;
-
-            if (!m_HasStoredSnapMask && m_ToolSystem?.activeTool != null && m_ToolSystem.activeTool != m_ObjectToolSystem)
-            {
-                m_StoredSnapMask = m_ToolSystem.activeTool.selectedSnap;
-                m_HasStoredSnapMask = true;
-            }
-
-            ToolEnabled = true;
-       
-            OnToolActivated();
+            ApplySnapMaskToActiveTool();
             QueuePreviewRebuild();
         }
-
-        /// <summary>Safely requests the tool to be disabled with a specified exit behavior mode.</summary>
-        public void RequestDisable(ToolExitMode exitMode)
-        {
-            if (ToolEnabled)
-                DisableToolMode(exitMode);
-        }
-
-        /// <summary>Deactivates the tool, resets internal live states, and restores the previous game UI and tool configuration.</summary>
-        protected void DisableToolMode(ToolExitMode exitMode)
-        {
-            try
-            {
-                UnityEngine.Debug.LogWarning(
-    $"[MertsToolBox][TOOL-STATE][{GetToolName()}] DisableToolMode({exitMode}) | ToolEnabled(before)={ToolEnabled} | activeTool={m_ToolSystem?.activeTool?.GetType().Name}");
-                ToolEnabled = false;
-                OnToolDeactivated();
-
-                ClearLivePreviewState();
-                RestoreSnapState();
-
-                m_PendingDisableAfterPlacement = false;
-                m_PendingCostResolve = false;
-
-                if (exitMode == ToolExitMode.RestoreFromPlacement && m_SessionRoadPrefab != null)
-                {
-                    ForceUpdateUIAndTool(m_SessionRoadPrefab, updateTool: true, selectCategory: true);
-                    m_PendingExitMode = ToolExitMode.None;
-                }
-                else if (exitMode == ToolExitMode.RestoreFromEscape && m_SessionRoadPrefab != null)
-                {
-                    MertToolState.SuppressUiAbortDuringRestore = true;
-                    m_PendingExitMode = ToolExitMode.RestoreFromEscape;
-                    m_PendingExitRoadPrefab = m_SessionRoadPrefab;
-                }
-                else if (exitMode == ToolExitMode.SilentTabClose && m_SessionRoadPrefab != null)
-                {
-                    ForceUpdateUIAndTool(m_SessionRoadPrefab, updateTool: false, selectCategory: false);
-                    m_SessionRoadPrefab = null;
-                    m_PendingExitMode = ToolExitMode.None;
-                }
-                else if (exitMode == ToolExitMode.UserSelectionClose)
-                {
-                    m_SessionRoadPrefab = null;
-                    m_PendingExitMode = ToolExitMode.None;
-                }
-            }
-            catch (Exception e)
-            {
-                UnityEngine.Debug.LogWarning($"[MertsToolBox] DisableToolMode error: {e.Message}");
-            }
-        }
-
-        /// <summary>Resets pending handoffs, geometry sizes, and active tools to clear the visual preview from the map.</summary>
-        private void ClearLivePreviewState()
-        {
-            ClearPendingHandoff();
-
-            m_PreviewRebuildQueued = false;
-            m_PendingCreateShape = false;
-            m_ExecuteCreateShape = false;
-            m_IsCreatingShape = false;
-
-
-            if (RuntimeStampEntity != Entity.Null && EntityManager.Exists(RuntimeStampEntity))
-            {
-                if (EntityManager.TryGetComponent(RuntimeStampEntity, out ObjectGeometryData geom))
-                {
-                    geom.m_Size = float3.zero;
-                    EntityManager.SetComponentData(RuntimeStampEntity, geom);
-                }
-            }
-
-            if (m_ToolSystem != null && m_ObjectToolSystem != null && m_NetToolSystem != null)
-            {
-                if (m_ToolSystem.activeTool == m_ObjectToolSystem)
-                {
-                    m_ToolSystem.selected = Entity.Null;
-                    m_ToolSystem.activeTool = m_NetToolSystem;
-                }
-            }
-        }
-
         #endregion
 
-        #region 13. SNAP STATE QUERIES
+        #region State Management & Handoff
+        /// <summary>
+        /// Flags the system to rebuild the preview shape on the next update loop.
+        /// </summary>
+        public void QueuePreviewRebuild() { m_PendingCreateShape = true; }
 
-        /// <summary>Returns whether snapping to existing network geometry is currently enabled.</summary>
-        public bool IsSnapGeometryEnabled() => m_SnapGeometryEnabled;
+        /// <summary>
+        /// Attempts to mutate the runtime stamp with newly generated geometry and cost metadata.
+        /// </summary>
+        protected virtual bool TryMutateTargetStamp()
+        {
+            if (m_RuntimeStamp == null)
+                return false;
 
-        /// <summary>Returns whether snapping to network sides is currently enabled.</summary>
-        public bool IsSnapNetSideEnabled() => m_SnapNetSideEnabled;
+            NetPrefab roadPrefab = TryGetCurrentSelectedRoadPrefab();
+            if (roadPrefab == null)
+                return false;
 
-        /// <summary>Returns whether snapping to network areas is currently enabled.</summary>
-        public bool IsSnapNetAreaEnabled() => m_SnapNetAreaEnabled;
+            if (!TryGenerateGeometry(
+                roadPrefab,
+                out ObjectSubNetInfo[] generatedSubNets,
+                out int widthCells,
+                out int depthCells,
+                out float costElevation))
+            {
+                return false;
+            }
 
+            m_RuntimeStamp.m_Width = math.max(4, widthCells);
+            m_RuntimeStamp.m_Depth = math.max(4, depthCells);
+
+            if (!m_RuntimeStamp.TryGet<ObjectSubNets>(out ObjectSubNets objectSubNets) || objectSubNets == null)
+            {
+                objectSubNets = m_RuntimeStamp.AddComponent<ObjectSubNets>();
+            }
+
+            objectSubNets.m_SubNets = generatedSubNets;
+
+            ApplyCostMetadata(m_RuntimeStamp, generatedSubNets, roadPrefab, costElevation);
+
+            m_RuntimeStamp.asset?.MarkDirty();
+            m_LastUsedRoadPrefab = roadPrefab;
+
+            return true;
+        }
+
+        /// <summary>
+        /// Caches the current road and category context to memory prior to an interface handoff.
+        /// </summary>
+        protected void PrimeTabHandoffSourceContext()
+        {
+            NetPrefab road = GetCurrentRealRoadForTabHandoff();
+            Entity category = GetCurrentRealCategoryForTabHandoff();
+
+            MertToolState.PrimeTabHandoffSource(road, category);
+        }
         #endregion
 
-        #region 14. PREFAB / UI RESOLUTION
-
-        /// <summary>Safely extracts the currently selected road prefab from the ToolbarUI binding or falls back to stored states.</summary>
+        #region Data & Prefab Retrieval
+        /// <summary>
+        /// Safely retrieves the currently selected road prefab from the toolbar UI.
+        /// </summary>
         protected NetPrefab TryGetCurrentSelectedRoadPrefab()
         {
             try
             {
                 var toolbarUISystem = World.GetExistingSystemManaged<Game.UI.InGame.ToolbarUISystem>();
-                var prefabSystem = World.GetExistingSystemManaged<PrefabSystem>();
-
-                if (toolbarUISystem != null && prefabSystem != null)
+                if (toolbarUISystem != null && m_PrefabSystem != null)
                 {
                     var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
                     var field = toolbarUISystem.GetType().GetField("m_SelectedAssetBinding", flags);
-
                     if (field != null)
                     {
                         var binding = field.GetValue(toolbarUISystem);
@@ -354,90 +245,79 @@ namespace MertsToolBox
                                 var entityObj = valueProp.GetValue(binding);
                                 if (entityObj is Entity entity && entity != Entity.Null)
                                 {
-                                    if (prefabSystem.TryGetPrefab<PrefabBase>(entity, out var prefabBase) && prefabBase is NetPrefab netPrefab)
-                                    {
+                                    if (m_PrefabSystem.TryGetPrefab<PrefabBase>(entity, out var prefabBase) && prefabBase is NetPrefab netPrefab)
                                         return netPrefab;
-                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-            catch (Exception e)
-            {
-                UnityEngine.Debug.LogWarning($"[MertsToolBox] TryGetCurrentSelectedRoadPrefab error: {e.Message}");
-            }
-
+            catch { }
             return MertToolState.LastResolvedRoadPrefab;
         }
 
-        /// <summary>Resolves the road prefab to be used by falling back through active, session, and globally stored preferences.</summary>
-        protected NetPrefab ResolveRoadPrefabForToolWork()
+        /// <summary>
+        /// Estimates the physical width of a given road prefab using its geometry data.
+        /// </summary>
+        protected float EstimateRoadWidth(NetPrefab roadPrefab)
         {
-            var current = TryGetCurrentSelectedRoadPrefab();
-            if (current != null) return current;
-            if (m_SessionRoadPrefab != null) return m_SessionRoadPrefab;
-            if (m_LastUsedRoadPrefab != null) return m_LastUsedRoadPrefab;
-            if (MertToolState.LastResolvedRoadPrefab != null) return MertToolState.LastResolvedRoadPrefab;
-            return null;
+            if (roadPrefab == null) return 8f;
+            Entity entity = m_PrefabSystem.GetEntity(roadPrefab);
+            if (EntityManager.TryGetComponent(entity, out NetGeometryData geometryData) && geometryData.m_DefaultWidth > 0.1f)
+                return geometryData.m_DefaultWidth;
+            return 8f;
         }
 
-        /// <summary>Forces the game UI and tool system to select a target prefab, suppressing memory captures to prevent infinite loops.</summary>
-        private void ForceUpdateUIAndTool(NetPrefab targetPrefab, bool updateTool, bool selectCategory)
+        /// <summary>
+        /// Retrieves the current elevation setting from the base network tool system.
+        /// </summary>
+        protected float GetCurrentNetToolElevation()
         {
-            try
-            {
-                var toolbarUISystem = World.GetExistingSystemManaged<Game.UI.InGame.ToolbarUISystem>();
-                Entity prefabEntity = m_PrefabSystem.GetEntity(targetPrefab);
-
-                if (toolbarUISystem != null && prefabEntity != Entity.Null)
-                {
-                    var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
-                    var selectMethod = toolbarUISystem.GetType().GetMethod("SelectAsset", flags, null, new Type[] { typeof(Entity), typeof(bool) }, null);
-                    var selectCategoryMethod = toolbarUISystem.GetType().GetMethod("SelectAssetCategory", flags);
-
-                    if (selectMethod != null)
-                    {
-                        MertToolState.SuppressUiMemoryCapture = true;
-                        MertToolState.SuppressCategoryCapture = true;
-
-                        try
-                        {
-                            if (selectCategory && selectCategoryMethod != null && MertToolState.LastResolvedCategory != Entity.Null)
-                            {
-                                selectCategoryMethod.Invoke(toolbarUISystem, new object[] { MertToolState.LastResolvedCategory });
-                            }
-
-                            selectMethod.Invoke(toolbarUISystem, new object[] { prefabEntity, updateTool });
-                        }
-                        finally
-                        {
-                            MertToolState.SuppressUiMemoryCapture = false;
-                            MertToolState.SuppressCategoryCapture = false;
-                        }
-                        return;
-                    }
-                }
-
-                if (updateTool)
-                    m_ToolSystem.ActivatePrefabTool(targetPrefab);
-            }
-            catch (Exception)
-            {
-                MertToolState.SuppressUiMemoryCapture = false;
-                MertToolState.SuppressCategoryCapture = false;
-
-                if (updateTool)
-                    m_ToolSystem.ActivatePrefabTool(targetPrefab);
-            }
+            try { return m_NetToolSystem == null ? 0f : m_NetToolSystem.elevation; }
+            catch { return 0f; }
         }
 
+        /// <summary>
+        /// Retrieves the currently selected road prefab specifically for UI synchronization purposes.
+        /// </summary>
+        public NetPrefab GetToolbarSelectedRoadPrefabForUiSync()
+        {
+            return TryGetCurrentSelectedRoadPrefab();
+        }
+
+        /// <summary>
+        /// Gets the active road prefab or falls back to the last resolved road for seamless tab transitions.
+        /// </summary>
+        protected NetPrefab GetCurrentRealRoadForTabHandoff()
+        {
+            return TryGetCurrentSelectedRoadPrefab() ?? MertToolState.LastResolvedRoadPrefab;
+        }
+
+        /// <summary>
+        /// Resolves the active category entity required for seamless UI tab handoffs.
+        /// </summary>
+        protected Entity GetCurrentRealCategoryForTabHandoff()
+        {
+            Entity category = GetCurrentlySelectedCategoryEntity();
+
+            if (category == Entity.Null)
+            {
+                NetPrefab road = GetCurrentRealRoadForTabHandoff();
+                category = ResolveCategoryFromRoadPrefab(road);
+            }
+
+            if (category == Entity.Null)
+                category = MertToolState.LastResolvedCategory;
+
+            return category;
+        }
         #endregion
 
-        #region 15. UTILITIES
-
-        /// <summary>Returns the previous index in an array, wrapping around to the end if it goes below zero.</summary>
+        #region Mathematical Utilities
+        /// <summary>
+        /// Safely cycles downwards through a predefined array of step indices, wrapping to the end.
+        /// </summary>
         protected int CycleIndex<T>(int currentIndex, T[] steps)
         {
             if (steps == null || steps.Length == 0) return 0;
@@ -445,101 +325,54 @@ namespace MertsToolBox
             return nextIndex < 0 ? steps.Length - 1 : nextIndex;
         }
 
-        /// <summary>Retrieves a float value from a step array using a clamped index to prevent out-of-bounds exceptions.</summary>
+        /// <summary>
+        /// Retrieves the specific float value from an array using a clamped index.
+        /// </summary>
         protected float GetCurrentStepValue(int currentIndex, float[] steps)
         {
             if (steps == null || steps.Length == 0) return 0f;
             return steps[math.clamp(currentIndex, 0, steps.Length - 1)];
         }
 
-        /// <summary>Retrieves a generic value from a step array using a clamped index to prevent out-of-bounds exceptions.</summary>
-        protected T GetCurrentStepValue<T>(int currentIndex, T[] steps)
+        /// <summary>
+        /// Retrieves the specific integer value from an array using a clamped index.
+        /// </summary>
+        protected int GetCurrentStepValue(int currentIndex, int[] steps)
         {
-            if (steps == null || steps.Length == 0) return default;
+            if (steps == null || steps.Length == 0) return 0;
             return steps[math.clamp(currentIndex, 0, steps.Length - 1)];
         }
 
-        /// <summary>Calculates the next step-aligned float value based on the specified direction to ensure neat increments.</summary>
-        protected static float GetNextStepAlignedValue(float currentValue, float stepSize, int direction)
+        /// <summary>
+        /// Calculates the next float value strictly aligned to the defined step grid.
+        /// </summary>
+        protected float GetNextStepAlignedValue(float currentValue, float stepSize, int direction)
         {
-            if (stepSize <= 0f || direction == 0)
-                return currentValue;
-
+            if (stepSize <= 0f || direction == 0) return currentValue;
             const float epsilon = 0.0001f;
-
             if (direction > 0)
             {
                 float next = math.floor(currentValue / stepSize) * stepSize + stepSize;
-                if (next <= currentValue + epsilon)
-                    next += stepSize;
+                if (next <= currentValue + epsilon) next += stepSize;
                 return next;
             }
             else
             {
                 float prev = math.ceil(currentValue / stepSize) * stepSize - stepSize;
-                if (prev >= currentValue - epsilon)
-                    prev -= stepSize;
+                if (prev >= currentValue - epsilon) prev -= stepSize;
                 return prev;
             }
         }
 
-        /// <summary>Calculates the next step-aligned integer value based on the specified direction.</summary>
-        protected static int GetNextStepAlignedInt(int currentValue, int stepSize, int direction)
+        /// <summary>
+        /// Calculates the next integer value strictly aligned to the defined step grid.
+        /// </summary>
+        protected int GetNextStepAlignedInt(int currentValue, int stepSize, int direction)
         {
-            if (stepSize <= 0 || direction == 0)
-                return currentValue;
-
-            if (direction > 0)
-                return ((currentValue / stepSize) + 1) * stepSize;
-
+            if (stepSize <= 0 || direction == 0) return currentValue;
+            if (direction > 0) return ((currentValue / stepSize) + 1) * stepSize;
             return ((currentValue - 1) / stepSize) * stepSize;
         }
-
-        /// <summary>Calculates the next step-aligned float value and clamps it strictly within the provided minimum and maximum boundaries.</summary>
-        protected static float GetNextStepAlignedValueClamped(float currentValue, float stepSize, int direction, float minValue, float maxValue)
-        {
-            float next = GetNextStepAlignedValue(currentValue, stepSize, direction);
-            return math.clamp(next, minValue, maxValue);
-        }
-
-        /// <summary>Estimates the default physical width of the given road prefab from its geometry data, falling back to 8m.</summary>
-        protected float EstimateRoadWidth(NetPrefab roadPrefab)
-        {
-            if (roadPrefab == null) return 8f;
-
-            Entity entity = m_PrefabSystem.GetEntity(roadPrefab);
-            if (EntityManager.TryGetComponent(entity, out NetGeometryData geometryData))
-            {
-                if (geometryData.m_DefaultWidth > 0.1f)
-                    return geometryData.m_DefaultWidth;
-            }
-
-            return 8f;
-        }
-
-        /// <summary>Safely retrieves the current elevation level from the game's NetToolSystem, returning 0 on failure.</summary>
-        protected float GetCurrentNetToolElevation()
-        {
-            try
-            {
-                return m_NetToolSystem == null ? 0f : m_NetToolSystem.elevation;
-            }
-            catch
-            {
-                return 0f;
-            }
-        }
-
-        /// <summary>Delays the automatic tool disable sequence to allow for continuous user interactions without interruptions.</summary>
-        public void SuppressNextAutoDisable(double seconds = 0.08)
-        {
-            m_SuppressAutoDisableUntil = Math.Max(
-                m_SuppressAutoDisableUntil,
-                RealtimeNow + seconds
-            );
-        }
-
         #endregion
- 
     }
 }

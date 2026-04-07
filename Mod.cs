@@ -39,7 +39,6 @@ namespace MertsToolBox
             updateSystem.UpdateAt<MertsToolBox.SuperEllipseToolSystem>(SystemUpdatePhase.ToolUpdate);
             updateSystem.UpdateAt<MertsToolBox.GridToolSystem>(SystemUpdatePhase.ToolUpdate);
             updateSystem.UpdateAt<MertsToolBox.MertToolBoxUISystem>(SystemUpdatePhase.UIUpdate);
-            updateSystem.UpdateAt<MertsSubstractCleanupSystem>(SystemUpdatePhase.ToolUpdate);
             updateSystem.UpdateAt<MertsToolBox.HelixToolErrorFlagSystem>(SystemUpdatePhase.ToolUpdate);
             
             ModRuntime.Log("ToolBox loaded.");
