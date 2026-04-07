@@ -1,7 +1,5 @@
 ﻿import React, { useEffect, useState } from "react";
 import { bindValue, trigger, useValue } from "cs2/api";
-import styles from "./ToolBoxPanel.module.scss";
-import subtractIcon from "./Icons/Subtract.svg";
 import { formatMeters, formatSmart } from "./Formatters";
 // --- GLOBAL BINDINGS (C# TO UI) ---
 

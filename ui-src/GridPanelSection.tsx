@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { bindValue, trigger, useValue } from "cs2/api";
-import styles from "./ToolBoxPanel.module.scss";
 import alternatingIcon from "./Icons/Alternating.svg";
 import orientationIcon from "./Icons/Orientation.svg";
 import { formatUnits, formatSmart } from "./Formatters";

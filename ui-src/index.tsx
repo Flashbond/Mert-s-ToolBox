@@ -8,7 +8,6 @@ import { SuperEllipsePanelSection } from "./SuperEllipsePanelSection";
 import { GridPanelSection } from "./GridPanelSection";
 import { ToolBoxActionHints } from "./ToolBoxActionHints";
 import { useVanillaClasses } from "./VanilliaResolver";
-import styles from "./ToolBoxPanel.module.scss";
 
 import circleIcon from "./Icons/Circle.svg";
 import helixIcon from "./Icons/Helix.svg";

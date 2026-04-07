@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { bindValue, trigger, useValue } from "cs2/api";
-import styles from "./ToolBoxPanel.module.scss";
-import subtractIcon from "./Icons/Subtract.svg";
 import { MertSlider } from "./MertSlider";
-import {formatMeters, formatSmart } from "./Formatters";
+import { formatMeters, formatSmart } from "./Formatters";
+
 // --- GLOBAL BINDINGS (C# TO UI) ---
 
 const activeToolMode$ = bindValue<string>("MertsToolBox", "ActiveTool");
