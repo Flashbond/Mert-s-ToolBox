@@ -24,9 +24,11 @@ USAGE
 4.	Click to place the procedural shape into your city.
 
 COMPATIBILITY
+
 Currently optimized for standard road types. Some specialized networks (bridges, dirt roads, pedestrian paths, alleys) are intentionally restricted to maintain strict geometric consistency.
 
 KNOWN ISSUES
+
 This mod has known compability issiues with certain mod setups. If you are having tool bar visibility problems, you can download "Mert's Perfect Circle Tool v1.3.0" from releases section. This is the final version with Settings.coc file fix. 
 
 INSTALLATION
