@@ -1,17 +1,27 @@
 MERT'S TOOLBOX
+
 A comprehensive suite of procedural road creation tools for Cities: Skylines II. Precision meets performance with robust, zero-flicker procedural roadways. 
 
 INCLUDED TOOLS
+
 • Perfect Circle: Create mathematically perfect circular roads with real-time diameter adjustments.
+
 • Procedural Helix: Build complex, multi-level spiral interchanges with customizable turns, clearance, and radius.
+
 • Super Ellipse: Construct smooth, continuous super-elliptical road networks with dynamic shape controls.
+
 • Smart Grid: Generate extensive, perfectly aligned road grids instantly with adjustable rows, columns, and block dimensions.
 
 CORE FEATURES
+
 • Rebuilt from the ground up utilizing Unity DOTS/ECS for zero-flicker, instantaneous live previews.
+
 • Flawless Snapping: Deep integration with the vanilla snapping engine (Node, Edge, Area) for pixel-perfect road connections.
+
 • Real-Time Cost Preview: Accurate, highly synchronized deferred cost calculations before placement.
+
 • Dynamic Controls: Precise parameter adjustments (e.g., Ctrl + Mouse Wheel) on the fly.
+
 • Native UI Integration: Seamlessly integrated into the game's standard tool panel.
 
 USAGE
