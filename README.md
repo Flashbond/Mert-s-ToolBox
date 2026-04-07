@@ -39,7 +39,7 @@ Currently optimized for standard road types. Some specialized networks (bridges,
 
 KNOWN ISSUES
 
-This mod has known compability issiues with certain mod setups. If you are having tool bar visibility problems, you can download "Mert's Perfect Circle Tool v1.3.0" from releases section. This is the final version with Settings.coc file fix. 
+This mod has known compability issiues with certain mod setups. If you are having toolbar visibility problems, you can download "Mert's Perfect Circle Tool v1.3.0" from releases section. This is the final version with Settings.coc file fix. 
 
 
 INSTALLATION
