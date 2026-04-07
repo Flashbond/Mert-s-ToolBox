@@ -16,7 +16,6 @@ namespace MertsToolBox
             {
                 CaptureLaunchRestoreContext();
                 PrimeTabHandoffSourceContext();
-                PrimeTabHandoffSourceContext();
 
                 m_SuppressPlacementUntil = RealtimeNow + 0.06;
                 OnToolActivated();

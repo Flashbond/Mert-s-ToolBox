@@ -4,6 +4,7 @@ using Game.Prefabs;
 using Game.Tools;
 using Unity.Entities;
 using Unity.Mathematics;
+using System.Collections.Generic;
 
 namespace MertsToolBox
 {
@@ -16,10 +17,26 @@ namespace MertsToolBox
         protected PrefabSystem m_PrefabSystem;
         protected ToolRaycastSystem m_ToolRaycastSystem;
 
-        protected static AssetStampPrefab s_SharedRuntimeStamp;
-        protected static Entity s_SharedRuntimeStampEntity;
-        protected static bool s_SharedStampRegistered;
-        protected static bool s_PrebakeCompleted;
+        // --- Per-road stamp registry (NEW) ---
+        protected static readonly Dictionary<Entity, AssetStampPrefab> s_StampByRoadEntity = new();
+        protected static readonly Dictionary<Entity, Entity> s_StampEntityByRoadEntity = new();
+        protected static readonly Dictionary<Entity, StampBakeState> s_BakeStateByRoadEntity = new();
+
+        protected static bool s_StampBakeSessionStarted;
+        protected static bool s_StampBakeSessionSealed;
+        protected static int s_BakeStablePasses;
+        protected static int s_LastDiscoveredRoadCount;
+
+        protected const int BakeStablePassesRequired = 3;
+
+        protected enum StampBakeState
+        {
+            NotSeen = 0,
+            Pending = 1,
+            Ready = 2,
+            Failed = 3
+        }
+ 
         protected static bool s_ObjectToolFoundationWarmed;
 
         protected AssetStampPrefab m_RuntimeStamp;
@@ -105,7 +122,6 @@ namespace MertsToolBox
             m_ToolRaycastSystem = World.GetOrCreateSystemManaged<ToolRaycastSystem>();
 
             Settings.OnOptionsChanged += OnSettingsChanged;
-            PrebakeRuntimeStamp();
         }
 
         /// <summary>
@@ -113,10 +129,12 @@ namespace MertsToolBox
         /// </summary>
         protected override void OnUpdate()
         {
-            if (!s_PrebakeCompleted)
+            if (!s_StampBakeSessionSealed || !s_ObjectToolFoundationWarmed)
                 TryLatePrebakeWithRealRoad();
+
             if (!ToolEnabled)
                 return;
+
             ProcessToolInput();
             CheckExitAndPlacementInputs();
 
@@ -133,14 +151,23 @@ namespace MertsToolBox
         protected override void OnDestroy()
         {
             Settings.OnOptionsChanged -= OnSettingsChanged;
-            if (s_SharedRuntimeStamp != null)
+
+            foreach (var kv in s_StampByRoadEntity)
             {
-                UnityEngine.Object.Destroy(s_SharedRuntimeStamp);
-                s_SharedRuntimeStamp = null;
+                if (kv.Value != null)
+                    UnityEngine.Object.Destroy(kv.Value);
             }
-            s_SharedStampRegistered = false;
-            s_PrebakeCompleted = false;
+
+            s_StampByRoadEntity.Clear();
+            s_StampEntityByRoadEntity.Clear();
+            s_BakeStateByRoadEntity.Clear();
+
+            s_StampBakeSessionStarted = false;
+            s_StampBakeSessionSealed = false;
+            s_BakeStablePasses = 0;
+            s_LastDiscoveredRoadCount = 0;
             s_ObjectToolFoundationWarmed = false;
+
             m_ToolSystem = null;
             m_ObjectToolSystem = null;
             m_NetToolSystem = null;
@@ -174,12 +201,15 @@ namespace MertsToolBox
         /// </summary>
         protected virtual bool TryMutateTargetStamp()
         {
-            if (m_RuntimeStamp == null)
-                return false;
-
             NetPrefab roadPrefab = TryGetCurrentSelectedRoadPrefab();
             if (roadPrefab == null)
                 return false;
+
+            if (!TryGetPrebakedStampForRoad(roadPrefab, out var prebakedStamp, out var prebakedEntity))
+                return false;
+
+            m_RuntimeStamp = prebakedStamp;
+            RuntimeStampEntity = prebakedEntity;
 
             if (!TryGenerateGeometry(
                 roadPrefab,

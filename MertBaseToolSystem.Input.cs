@@ -54,12 +54,11 @@ namespace MertsToolBox
         /// </summary>
         protected int GetScrollDirection()
         {
-            if (Keyboard.current == null || Mouse.current == null) return 0;
+            if (Mouse.current == null) return 0;
             float wheel = Mouse.current.scroll.ReadValue().y;
-            if (Mathf.Abs(wheel) < 0.01f) return 0;
-            if (RealtimeNow < m_InputCooldown) return 0;
+            if (Mathf.Abs(wheel) < 0.01f)
+                return 0;
 
-            m_InputCooldown = RealtimeNow + 0.01f;
             return wheel > 0 ? 1 : -1;
         }
 
