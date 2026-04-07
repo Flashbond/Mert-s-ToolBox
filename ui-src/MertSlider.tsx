@@ -17,39 +17,27 @@ export const MertSlider: React.FC<MertSliderProps> = ({
     const trackRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState(false);
 
-
-
-    // Matematiğin kalbi: Farenin konumunu değere çevirir
     const calculateValueFromMouse = useCallback((clientX: number) => {
         if (!trackRef.current) return value;
         
         const rect = trackRef.current.getBoundingClientRect();
-        // X ekseninde kaçıncı pikseldeyiz (sınırları aşmasını engelle)
         const xPos = Math.max(0, Math.min(clientX - rect.left, rect.width));
-        
-        // Yüzde hesabı
         const percentage = xPos / rect.width;
-        
-        // Yüzdeyi min-max aralığındaki gerçek değere çevir
         const rawValue = min + percentage * (max - min);
-        
-        // Step (adım) değerine yuvarla
         const steppedValue = Math.round(rawValue / step) * step;
         
-        // Son bir güvenlik (float hatalarına karşı)
         return Math.min(Math.max(steppedValue, min), max);
     }, [min, max, step, value]);
 
     const handleMouseDown = (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        trigger("MertsToolBox", "UiInteracted"); // Oyuna "ben buradayım odaklanma" mesajı
+        trigger("MertsToolBox", "UiInteracted");
         
         setIsDragging(true);
         onChange(calculateValueFromMouse(e.clientX));
     };
 
-    // Fare ekranın neresinde olursa olsun takibi bırakmamak için window eventleri
     useEffect(() => {
         if (!isDragging) return;
 
