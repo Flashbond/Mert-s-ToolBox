@@ -28,7 +28,7 @@
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/merts-perfect-circle-feedback-suggestions-bug-reports.1911521/" />
 
 	<!--Version of the mod-->
-	<ModVersion Value="2.0.3" />
+	<ModVersion Value="2.1.0" />
 
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.5.*" />
@@ -41,7 +41,7 @@
 
 	<!--Change log for new version-->
 	<ChangeLog>
-		* Possible fix for incompability with Easy Zone mod.
+		* Final.
 	</ChangeLog>
 
 	<!--External links-->
