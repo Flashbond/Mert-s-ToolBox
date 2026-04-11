@@ -2,9 +2,10 @@ using Colossal.Entities;
 using Game;
 using Game.Prefabs;
 using Game.Tools;
+using System.Collections.Generic;
+using System.Reflection;
 using Unity.Entities;
 using Unity.Mathematics;
-using System.Collections.Generic;
 
 namespace MertsToolBox
 {
@@ -17,30 +18,17 @@ namespace MertsToolBox
         protected PrefabSystem m_PrefabSystem;
         protected ToolRaycastSystem m_ToolRaycastSystem;
 
-        // --- Per-road stamp registry (NEW) ---
-        protected static readonly Dictionary<Entity, AssetStampPrefab> s_StampByRoadEntity = new();
-        protected static readonly Dictionary<Entity, Entity> s_StampEntityByRoadEntity = new();
-        protected static readonly Dictionary<Entity, StampBakeState> s_BakeStateByRoadEntity = new();
-
-        protected static bool s_StampBakeSessionStarted;
-        protected static bool s_StampBakeSessionSealed;
-        protected static int s_BakeStablePasses;
-        protected static int s_LastDiscoveredRoadCount;
-
-        protected const int BakeStablePassesRequired = 3;
-
-        protected enum StampBakeState
-        {
-            NotSeen = 0,
-            Pending = 1,
-            Ready = 2,
-            Failed = 3
-        }
- 
+        protected static AssetStampPrefab s_SharedRuntimeStamp;
+        protected static Entity s_SharedRuntimeStampEntity;
+        protected static bool s_SharedStampRegistered;
+        protected static bool s_PrebakeCompleted;
         protected static bool s_ObjectToolFoundationWarmed;
 
         protected AssetStampPrefab m_RuntimeStamp;
         public Entity RuntimeStampEntity { get; protected set; }
+
+        protected FieldInfo m_SelectedPrefabField;
+        protected FieldInfo m_PrefabField;
 
         protected NetPrefab m_LastUsedRoadPrefab;
         private AssetStampPrefab m_PendingHandoffStamp;
@@ -62,6 +50,26 @@ namespace MertsToolBox
         private bool m_IsCreatingShape;
         private bool m_PendingObjectToolHandoff;
 
+        // --- Per-road stamp registry (NEW) ---
+        protected static readonly Dictionary<Entity, AssetStampPrefab> s_StampByRoadEntity = new();
+        protected static readonly Dictionary<Entity, Entity> s_StampEntityByRoadEntity = new();
+        protected static readonly Dictionary<Entity, StampBakeState> s_BakeStateByRoadEntity = new();
+
+        protected static bool s_StampBakeSessionStarted;
+        protected static bool s_StampBakeSessionSealed;
+        protected static int s_BakeStablePasses;
+        protected static int s_LastDiscoveredRoadCount;
+
+        protected const int BakeStablePassesRequired = 3;
+
+        protected enum StampBakeState
+        {
+            NotSeen = 0,
+            Pending = 1,
+            Ready = 2,
+            Failed = 3
+        }
+
         /// <summary>
         /// Provides the current real-time since startup as a double precision value.
         /// </summary>
@@ -71,7 +79,6 @@ namespace MertsToolBox
         protected bool m_ContextUsesRoadNode = false;
 
         protected Game.Objects.PlacementFlags m_DesiredPlacementFlags =
-                    Game.Objects.PlacementFlags.OnGround |
                     Game.Objects.PlacementFlags.RoadEdge |
                     Game.Objects.PlacementFlags.RoadSide;
         #endregion
@@ -121,6 +128,9 @@ namespace MertsToolBox
             m_PrefabSystem = World.GetOrCreateSystemManaged<PrefabSystem>();
             m_ToolRaycastSystem = World.GetOrCreateSystemManaged<ToolRaycastSystem>();
 
+            m_SelectedPrefabField = typeof(NetToolSystem).GetField("m_SelectedPrefab", BindingFlags.Instance | BindingFlags.NonPublic);
+            m_PrefabField = typeof(NetToolSystem).GetField("m_Prefab", BindingFlags.Instance | BindingFlags.NonPublic);
+
             Settings.OnOptionsChanged += OnSettingsChanged;
         }
 
@@ -137,6 +147,8 @@ namespace MertsToolBox
 
             ProcessToolInput();
             CheckExitAndPlacementInputs();
+
+            
 
             if (m_PendingObjectToolHandoff && HandlePendingObjectToolHandoff())
                 return;
@@ -161,6 +173,15 @@ namespace MertsToolBox
             s_StampByRoadEntity.Clear();
             s_StampEntityByRoadEntity.Clear();
             s_BakeStateByRoadEntity.Clear();
+
+            if (s_WarmupRuntimeStamp != null)
+            {
+                UnityEngine.Object.Destroy(s_WarmupRuntimeStamp);
+                s_WarmupRuntimeStamp = null;
+            }
+
+            s_WarmupRuntimeStampEntity = Entity.Null;
+            s_WarmupStampRegistered = false;
 
             s_StampBakeSessionStarted = false;
             s_StampBakeSessionSealed = false;
@@ -233,6 +254,7 @@ namespace MertsToolBox
 
             ApplyCostMetadata(m_RuntimeStamp, generatedSubNets, roadPrefab, costElevation);
 
+
             m_RuntimeStamp.asset?.MarkDirty();
             m_LastUsedRoadPrefab = roadPrefab;
 
@@ -252,40 +274,7 @@ namespace MertsToolBox
         #endregion
 
         #region Data & Prefab Retrieval
-        /// <summary>
-        /// Safely retrieves the currently selected road prefab from the toolbar UI.
-        /// </summary>
-        protected NetPrefab TryGetCurrentSelectedRoadPrefab()
-        {
-            try
-            {
-                var toolbarUISystem = World.GetExistingSystemManaged<Game.UI.InGame.ToolbarUISystem>();
-                if (toolbarUISystem != null && m_PrefabSystem != null)
-                {
-                    var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
-                    var field = toolbarUISystem.GetType().GetField("m_SelectedAssetBinding", flags);
-                    if (field != null)
-                    {
-                        var binding = field.GetValue(toolbarUISystem);
-                        if (binding != null)
-                        {
-                            var valueProp = binding.GetType().GetProperty("value");
-                            if (valueProp != null)
-                            {
-                                var entityObj = valueProp.GetValue(binding);
-                                if (entityObj is Entity entity && entity != Entity.Null)
-                                {
-                                    if (m_PrefabSystem.TryGetPrefab<PrefabBase>(entity, out var prefabBase) && prefabBase is NetPrefab netPrefab)
-                                        return netPrefab;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            catch { }
-            return MertToolState.LastResolvedRoadPrefab;
-        }
+
 
         /// <summary>
         /// Estimates the physical width of a given road prefab using its geometry data.

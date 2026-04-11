@@ -53,9 +53,6 @@ namespace MertsToolBox
 
             if (settings != null)
             {
-                _ = AssetDatabase.global.SaveSettings();
-
-                settings?.ApplyAndSave();
                 settings?.UnregisterInOptionsUI();
             }
         }

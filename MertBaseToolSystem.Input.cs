@@ -133,7 +133,46 @@ namespace MertsToolBox
         /// </summary>
         protected Entity GetCurrentlySelectedCategoryEntity()
         {
-            return MertToolState.LastResolvedCategory;
+            if (MertToolState.LastResolvedCategory != Entity.Null)
+                return MertToolState.LastResolvedCategory;
+
+            NetPrefab currentRoad = TryGetCurrentSelectedRoadPrefab();
+            Entity resolved = ResolveCategoryFromRoadPrefab(currentRoad);
+            if (resolved != Entity.Null)
+                return resolved;
+
+            return Entity.Null;
+        }
+        /// <summary>
+        /// Safely retrieves the currently selected road prefab from the toolbar UI.
+        /// </summary>
+        protected NetPrefab TryGetCurrentSelectedRoadPrefab()
+        {
+            try
+            {
+                if (m_NetToolSystem == null)
+                    return MertToolState.LastResolvedRoadPrefab;
+
+                if (m_SelectedPrefabField != null)
+                {
+                    if (m_SelectedPrefabField.GetValue(m_NetToolSystem) is NetPrefab selectedPrefab && selectedPrefab != null)
+                        return selectedPrefab;
+                }
+
+                if (m_PrefabField != null)
+                {
+                    if (m_PrefabField.GetValue(m_NetToolSystem) is NetPrefab prefab && prefab != null)
+                        return prefab;
+                }
+
+                if (m_NetToolSystem.GetPrefab() is NetPrefab publicPrefab)
+                    return publicPrefab;
+            }
+            catch
+            {
+            }
+
+            return MertToolState.LastResolvedRoadPrefab;
         }
 
         /// <summary>
@@ -143,11 +182,6 @@ namespace MertsToolBox
         {
             NetPrefab currentRoad = TryGetCurrentSelectedRoadPrefab();
             Entity currentCategory = GetCurrentlySelectedCategoryEntity();
-
-            if (currentCategory == Entity.Null)
-            {
-                currentCategory = ResolveCategoryFromRoadPrefab(currentRoad);
-            }
 
             NetPrefab launchRoad = currentRoad ?? MertToolState.LastResolvedRoadPrefab;
             Entity launchCategory = currentCategory != Entity.Null

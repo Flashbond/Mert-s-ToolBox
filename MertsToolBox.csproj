@@ -31,7 +31,6 @@
 	  <Compile Include="MertBaseToolSystem.Reflection.txt" />
 	  <Compile Include="MertHarmonyPatches.PipelineTrace.txt" />
 	  <Compile Include="MertSubtractCleanupSystem.txt" />
-	  <Compile Include="ModRuntime.cs.txt" />
 	</ItemGroup>
 	
 
@@ -112,6 +111,7 @@
 		  <PackagePath>\</PackagePath>
 		</None>
 		<None Include="MertHarmonyPatches.cs" />
+		<None Include="ModRuntime.cs" />
 	</ItemGroup>
 
 	<ItemGroup>
