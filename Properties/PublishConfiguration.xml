@@ -3,7 +3,7 @@
 	<ModId Value="138174" />
 
 	<!--Name of the mod to display to players-->
-	<DisplayName Value="Mert's ToolBox" />
+	<DisplayName Value="Mert's ToolBox[Alpha]" />
 
 	<!--Short description of the mod-->
 	<ShortDescription Value="One tool to shape them all." />
@@ -28,7 +28,7 @@
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/merts-perfect-circle-feedback-suggestions-bug-reports.1911521/" />
 
 	<!--Version of the mod-->
-	<ModVersion Value="2.2.0[Alpha]" />
+	<ModVersion Value="2.3.0[Alpha]" />
 
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.5.*" />
@@ -41,7 +41,8 @@
 
 	<!--Change log for new version-->
 	<ChangeLog>
-		* Final.
+		* Stability improvements.
+		* Performance Optimizations.
 	</ChangeLog>
 
 	<!--External links-->
