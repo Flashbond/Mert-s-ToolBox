@@ -28,7 +28,7 @@
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/merts-perfect-circle-feedback-suggestions-bug-reports.1911521/" />
 
 	<!--Version of the mod-->
-	<ModVersion Value="2.4.0" />
+	<ModVersion Value="2.4.2" />
 
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.5.*" />
@@ -41,10 +41,7 @@
 
 	<!--Change log for new version-->
 	<ChangeLog>
-		* A comprehensive overhaul for better UI integration.
-		* Improved UI interaction.
-		* Fixed an issue with the Grid Tool live update.
-		* Fixed an issue with saving default settings.
+		* A major bug fix regarding menu transitions.
 	</ChangeLog>
 
 	<!--External links-->
