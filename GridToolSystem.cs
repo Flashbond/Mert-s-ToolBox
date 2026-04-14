@@ -120,13 +120,109 @@ namespace MertsToolBox
         {
             if (!ToolEnabled) return;
 
-            if (m_PendingBlockWidthChange != 0) { m_CurrentSessionBlockWidthU = math.clamp(m_CurrentSessionBlockWidthU + m_PendingBlockWidthChange, 2, 24); m_PendingBlockWidthChange = 0; }
-            if (m_PendingBlockLengthChange != 0) { m_CurrentSessionBlockLengthU = math.clamp(m_CurrentSessionBlockLengthU + m_PendingBlockLengthChange, 2, 24); m_PendingBlockLengthChange = 0; }
-            if (m_PendingColsChange != 0) { m_CurrentSessionColumns = math.clamp(m_CurrentSessionColumns + m_PendingColsChange, 1, 12); m_PendingColsChange = 0; }
-            if (m_PendingRowsChange != 0) { m_CurrentSessionRows = math.clamp(m_CurrentSessionRows + m_PendingRowsChange, 1, 12); m_PendingRowsChange = 0; }
+            if (m_PendingBlockWidthChange != 0) { ChangeBlockWidth(m_PendingBlockWidthChange); m_PendingBlockWidthChange = 0; }
+            if (m_PendingBlockLengthChange != 0) { ChangeBlockLength(m_PendingBlockLengthChange); m_PendingBlockLengthChange = 0; }
+            if (m_PendingColsChange != 0) { ChangeCols(m_PendingColsChange); m_PendingColsChange = 0; }
+            if (m_PendingRowsChange != 0) { ChangeRows(m_PendingRowsChange); m_PendingRowsChange = 0; }
 
-            if (m_PendingToggleAlternating) { if (IsCurrentPrefabValidForOneWayPattern()) m_IsAlternating = !m_IsAlternating; m_PendingToggleAlternating = false; }
-            if (m_PendingToggleOrientation) { if (IsCurrentPrefabValidForOneWayPattern()) m_IsOrientationLeftBottom = !m_IsOrientationLeftBottom; m_PendingToggleOrientation = false; }
+            if (m_PendingToggleAlternating)
+            {
+                if (IsCurrentPrefabValidForOneWayPattern()) ToggleAlternating();
+                m_PendingToggleAlternating = false;
+            }
+            if (m_PendingToggleOrientation)
+            {
+                if (IsCurrentPrefabValidForOneWayPattern()) ToggleOrientation();
+                m_PendingToggleOrientation = false;
+            }
+        }
+
+        // --- PUBLIC CHANGE METHODS---
+        public void ChangeBlockWidth(int direction)
+        {
+            int nextValue = GetCurrentBlockWidthU() + direction;
+            SetCurrentBlockWidthU(nextValue);
+        }
+
+        public void ChangeBlockLength(int direction)
+        {
+            int nextValue = GetCurrentBlockLengthU() + direction;
+            SetCurrentBlockLengthU(nextValue);
+        }
+
+        public void ChangeCols(int direction)
+        {
+            int nextValue = GetCurrentColumns() + direction;
+            SetCurrentColumns(nextValue);
+        }
+
+        public void ChangeRows(int direction)
+        {
+            int nextValue = GetCurrentRows() + direction;
+            SetCurrentRows(nextValue);
+        }
+
+        public void ToggleAlternating()
+        {
+            SetIsAlternating(!m_IsAlternating);
+        }
+
+        public void ToggleOrientation()
+        {
+            SetIsOrientationLeftBottom(!m_IsOrientationLeftBottom);
+        }
+
+        // --- PRIVATE SETTER METHODS (Güvenli Atama & Motor Tetikleme Katmanı) ---
+        private void SetCurrentBlockWidthU(int value)
+        {
+            int clamped = math.clamp(value, 2, 24);
+            if (m_CurrentSessionBlockWidthU == clamped) return;
+
+            m_CurrentSessionBlockWidthU = clamped;
+            QueuePreviewRebuild();
+        }
+
+        private void SetCurrentBlockLengthU(int value)
+        {
+            int clamped = math.clamp(value, 2, 24);
+            if (m_CurrentSessionBlockLengthU == clamped) return;
+
+            m_CurrentSessionBlockLengthU = clamped;
+            QueuePreviewRebuild();
+        }
+
+        private void SetCurrentColumns(int value)
+        {
+            int clamped = math.clamp(value, 1, 12);
+            if (m_CurrentSessionColumns == clamped) return;
+
+            m_CurrentSessionColumns = clamped;
+            QueuePreviewRebuild();
+        }
+
+        private void SetCurrentRows(int value)
+        {
+            int clamped = math.clamp(value, 1, 12);
+            if (m_CurrentSessionRows == clamped) return;
+
+            m_CurrentSessionRows = clamped;
+            QueuePreviewRebuild();
+        }
+
+        private void SetIsAlternating(bool value)
+        {
+            if (m_IsAlternating == value) return;
+
+            m_IsAlternating = value;
+            QueuePreviewRebuild();
+        }
+
+        private void SetIsOrientationLeftBottom(bool value)
+        {
+            if (m_IsOrientationLeftBottom == value) return;
+
+            m_IsOrientationLeftBottom = value;
+            QueuePreviewRebuild();
         }
         #endregion
 

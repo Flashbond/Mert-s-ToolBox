@@ -1,8 +1,8 @@
 {
-  "name": "Mert's ToolBox[Alpha]",
-  "id": "MertsToolBox[Alpha]",
-  "version": "2.3.0[Alpha]",
-  "description": "Everything you need.",
+  "name": "Mert's ToolBox",
+  "id": "MertsToolBox",
+  "version": "2.4.0",
+  "description": "One tool to shape them all.",
   "author": "Mert",
   "game": "cs2",
   "dependencies": []

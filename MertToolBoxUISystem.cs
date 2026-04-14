@@ -1,9 +1,11 @@
+using Colossal.Entities;
 using Colossal.UI.Binding;
 using Game.Prefabs;
 using Game.Tools;
 using Game.UI;
 using System;
 using System.Globalization;
+using System.Reflection;
 using Unity.Entities;
 using UnityEngine.Scripting;
 
@@ -145,6 +147,12 @@ namespace MertsToolBox
                 () => m_HelixTool != null ? m_HelixTool.GetCurrentClearance() : 8f));
             AddUpdateBinding(new MertPolledBinding<int>(ModId, "HelixClearanceStepIndex",
                 () => m_HelixTool != null ? m_HelixTool.GetCurrentClearanceStepIndex() : 0));
+            AddUpdateBinding(new MertPolledBinding<int>(ModId, "HelixDiameterStepSize",
+                () => m_HelixTool != null ? m_HelixTool.GetDiameterStepSize() : 8));
+            AddUpdateBinding(new MertPolledBinding<float>(ModId, "HelixTurnStepSize",
+                () => m_HelixTool != null ? m_HelixTool.GetTurnStepSize() : 2f));
+            AddUpdateBinding(new MertPolledBinding<float>(ModId, "HelixClearanceStepSize",
+                () => m_HelixTool != null ? m_HelixTool.GetClearanceStepSize() : 2f));
 
             // SuperEllipse Bindings
             AddUpdateBinding(new MertPolledBinding<float>(ModId, "SuperEllipseWidth",
@@ -157,6 +165,10 @@ namespace MertsToolBox
                 () => m_SuperEllipseTool != null ? m_SuperEllipseTool.GetCurrentLengthStepIndex() : 0));
             AddUpdateBinding(new MertPolledBinding<float>(ModId, "SuperEllipseN",
                 () => m_SuperEllipseTool != null ? m_SuperEllipseTool.GetCurrentNSliderValue() : 8f));
+            AddUpdateBinding(new MertPolledBinding<float>(ModId, "SuperEllipseWidthStepSize",
+                () => m_SuperEllipseTool != null ? m_SuperEllipseTool.GetWidthStepSize() : 8f));
+            AddUpdateBinding(new MertPolledBinding<float>(ModId, "SuperEllipseLengthStepSize",
+                () => m_SuperEllipseTool != null ? m_SuperEllipseTool.GetLengthStepSize() : 8f));
 
             // Grid Bindings
             AddUpdateBinding(new MertPolledBinding<int>(ModId, "GridBlockWidth",
@@ -300,6 +312,14 @@ namespace MertsToolBox
         /// </summary>
         private void OnToolChanged(ToolBaseSystem tool)
         {
+            string incoming =
+                tool == null ? "NULL" :
+                tool.GetType().Name;
+
+            string active =
+                m_ToolSystem?.activeTool == null ? "NULL" :
+                m_ToolSystem.activeTool.GetType().Name;
+
             if (MertToolState.SuppressToolChangedDuringColdstart)
                 return;
             if (MertToolState.SuppressUiAbortDuringRestore)
@@ -332,6 +352,32 @@ namespace MertsToolBox
             {
                 CloseTools(ToolExitMode.UserSelectionClose);
             }
+            if (tool == objectTool)
+            {
+                bool anyCustomToolOpen =
+                    (m_CircleTool != null && m_CircleTool.ToolEnabled) ||
+                    (m_HelixTool != null && m_HelixTool.ToolEnabled) ||
+                    (m_SuperEllipseTool != null && m_SuperEllipseTool.ToolEnabled) ||
+                    (m_GridTool != null && m_GridTool.ToolEnabled);
+
+                if (!anyCustomToolOpen &&
+                    !MertToolState.PendingRestore &&
+                    !MertToolState.TabHandoffActive &&
+                    !MertToolState.HasReleasedStaleObjectToolThisFrame)
+                {
+                    MertToolState.HasReleasedStaleObjectToolThisFrame = true;
+
+                    if (m_ToolSystem != null && netTool != null)
+                    {
+                        m_ToolSystem.selected = Entity.Null;
+                        m_ToolSystem.activeTool = netTool;
+                    }
+
+                    return;
+                }
+
+                return;
+            }
         }
         #endregion
 
@@ -343,18 +389,18 @@ namespace MertsToolBox
         {
             if (!MertToolState.PendingRestore)
                 return;
-
+            
             if (MertToolState.PendingRestoreMode == ToolExitMode.None)
             {
                 MertToolState.ClearPendingRestore();
                 return;
             }
+
             if (m_ToolSystem == null)
                 return;
 
             NetPrefab road = MertToolState.PendingRestoreRoad;
             Entity category = MertToolState.PendingRestoreCategory;
-            ToolExitMode mode = MertToolState.PendingRestoreMode;
 
             var toolbarUISystem = World.GetExistingSystemManaged<Game.UI.InGame.ToolbarUISystem>();
             var prefabSystem = World.GetExistingSystemManaged<PrefabSystem>();
@@ -374,29 +420,88 @@ namespace MertsToolBox
                             System.Reflection.BindingFlags.NonPublic |
                             System.Reflection.BindingFlags.Public;
 
-                if (category != Entity.Null)
+                var selectCategory = toolbarUISystem.GetType()
+                    .GetMethod("SelectAssetCategory", flags, null, new Type[] { typeof(Entity) }, null);
+
+                var selectAsset = toolbarUISystem.GetType()
+                    .GetMethod("SelectAsset", flags, null, new Type[] { typeof(Entity), typeof(bool) }, null);
+
+                bool categoryLooksValid =
+                    category != Entity.Null &&
+                    World != null &&
+                    World.EntityManager.Exists(category) &&
+                    World.EntityManager.HasComponent<UIAssetCategoryData>(category);
+
+                if (!categoryLooksValid && road != null)
                 {
-                    var selectCategory = toolbarUISystem.GetType()
-                        .GetMethod("SelectAssetCategory", flags, null, new Type[] { typeof(Entity) }, null);
-                    selectCategory?.Invoke(toolbarUISystem, new object[] { category });
+                    Entity roadEntity = prefabSystem.GetEntity(road);
+                    if (roadEntity != Entity.Null &&
+                        World.EntityManager.Exists(roadEntity) &&
+                        World.EntityManager.TryGetComponent(roadEntity, out UIObjectData uiObject) &&
+                        uiObject.m_Group != Entity.Null &&
+                        World.EntityManager.Exists(uiObject.m_Group) &&
+                        World.EntityManager.HasComponent<UIAssetCategoryData>(uiObject.m_Group))
+                    {
+                        category = uiObject.m_Group;
+                        categoryLooksValid = true;
+                    }
+                }
+
+                if (categoryLooksValid)
+                {
+                    try
+                    {
+                        selectCategory?.Invoke(toolbarUISystem, new object[] { category });
+                    }
+                    catch (TargetInvocationException tie)
+                    {
+                        ModRuntime.Warn(
+                            $"[MertsToolBox] Restore category failed: {tie.InnerException?.Message ?? tie.Message}");
+                    }
+                    catch (Exception e)
+                    {
+                        ModRuntime.Warn(
+                            $"[MertsToolBox] Restore category failed: {e.Message}");
+                    }
                 }
 
                 if (road != null)
                 {
                     Entity roadEntity = prefabSystem.GetEntity(road);
-                    if (roadEntity != Entity.Null)
+                    if (roadEntity != Entity.Null && World.EntityManager.Exists(roadEntity))
                     {
-                        var selectAsset = toolbarUISystem.GetType()
-                            .GetMethod("SelectAsset", flags, null, new Type[] { typeof(Entity), typeof(bool) }, null);
-                        selectAsset?.Invoke(toolbarUISystem, new object[] { roadEntity, true });
+                        try
+                        {
+                            selectAsset?.Invoke(toolbarUISystem, new object[] { roadEntity, true });
+                        }
+                        catch (TargetInvocationException tie)
+                        {
+                            ModRuntime.Warn(
+                                $"[MertsToolBox] Restore asset failed: {tie.InnerException?.Message ?? tie.Message}");
+                        }
+                        catch (Exception e)
+                        {
+                            ModRuntime.Warn(
+                                $"[MertsToolBox] Restore asset failed: {e.Message}");
+                        }
                     }
                 }
 
                 m_ToolSystem.activeTool = netTool;
+                string activeAfter =
+                    m_ToolSystem?.activeTool == null ? "NULL" :
+                    m_ToolSystem.activeTool.GetType().Name;
 
                 if (road != null)
                 {
-                    m_ToolSystem.ActivatePrefabTool(road);
+                    try
+                    {
+                        m_ToolSystem.ActivatePrefabTool(road);
+                    }
+                    catch (Exception e)
+                    {
+                        ModRuntime.Warn($"[MertsToolBox] ActivatePrefabTool failed during restore: {e.Message}");
+                    }
                 }
             }
             finally

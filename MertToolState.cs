@@ -117,15 +117,6 @@ namespace MertsToolBox
         }
 
         /// <summary>
-        /// Marks the tab handoff process as active and targets the specified destination category.
-        /// </summary>
-        public static void ActivateTabHandoff(Entity toCategory)
-        {
-            TabHandoffToCategory = toCategory;
-            TabHandoffActive = true;
-        }
-
-        /// <summary>
         /// Resets all variables related to the tab handoff process.
         /// </summary>
         public static void ClearTabHandoff()

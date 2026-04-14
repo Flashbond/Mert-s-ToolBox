@@ -39,10 +39,16 @@ namespace MertsToolBox
         /// <summary>
         /// Determines if the provided prefab is our custom shared prebaked stamp.
         /// </summary>
-        public static bool IsOurStamp(PrefabBase prefab)
+        public static bool IsCurrentStamp(PrefabBase prefab)
         {
-            return prefab != null &&
-                   prefab.name.StartsWith("MertsToolBox_SharedPrebakedStamp", StringComparison.Ordinal);
+            if (prefab == null || string.IsNullOrEmpty(prefab.name))
+                return false;
+
+            string name = prefab.name;
+
+            return name.StartsWith("MertsToolBox_SharedPrebakedStamp", StringComparison.Ordinal) ||
+                   name.StartsWith("MertsToolBox_RoadStamp_", StringComparison.Ordinal) ||
+                   name.StartsWith("MertsToolBox_WarmupStamp_", StringComparison.Ordinal);
         }
 
         /// <summary>
@@ -166,48 +172,6 @@ namespace MertsToolBox
             }
 
             return false;
-        }
-        #endregion
-
-        #region UI Memory Injection
-        /// <summary>
-        /// Injects the specified source category and road into the toolbar UI system's internal memory via reflection.
-        /// </summary>
-        public static bool TryInjectSourceCategoryMemory(
-            ToolbarUISystem toolbarUi,
-            Entity sourceCategory,
-            NetPrefab sourceRoad)
-        {
-            if (toolbarUi == null)
-                return false;
-
-            if (sourceCategory == Entity.Null || sourceRoad == null)
-                return false;
-
-            if (!TryResolveMenuFromCategory(sourceCategory, out var sourceMenu))
-                return false;
-
-            if (!TryResolveEntity(sourceRoad, out var sourceRoadEntity))
-                return false;
-
-            var type = toolbarUi.GetType();
-
-            var lastSelectedCategoriesField = type.GetField("m_LastSelectedCategories", Flags);
-            var lastSelectedAssetsField = type.GetField("m_LastSelectedAssets", Flags);
-
-            if (lastSelectedCategoriesField == null || lastSelectedAssetsField == null)
-                return false;
-
-            var lastSelectedCategories = lastSelectedCategoriesField.GetValue(toolbarUi) as IDictionary;
-            var lastSelectedAssets = lastSelectedAssetsField.GetValue(toolbarUi) as IDictionary;
-
-            if (lastSelectedCategories == null || lastSelectedAssets == null)
-                return false;
-
-            lastSelectedCategories[sourceMenu] = sourceCategory;
-            lastSelectedAssets[sourceCategory] = sourceRoadEntity;
-
-            return true;
         }
         #endregion
     }

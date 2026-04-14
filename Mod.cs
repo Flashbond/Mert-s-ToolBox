@@ -12,7 +12,6 @@ namespace MertsToolBox
 
         private Harmony m_Harmony;
         public static Settings settings;
-
         #endregion
 
         #region 2. MOD LIFECYCLE (IMod)
@@ -24,9 +23,9 @@ namespace MertsToolBox
         {
             settings = new Settings(this);
 
-            AssetDatabase.global.LoadSettings(nameof(Settings), settings, new Settings(this));
-            settings.RegisterKeyBindings();
             settings.RegisterInOptionsUI();
+
+            AssetDatabase.global.LoadSettings(nameof(Settings), settings, new Settings(this));
 
             var lm = GameManager.instance.localizationManager;
             lm.AddSource("en-US", new LocaleEN(settings));
@@ -51,12 +50,12 @@ namespace MertsToolBox
         {
             m_Harmony?.UnpatchAll();
 
-            if (settings != null)
+           if (settings != null)
             {
-                settings?.UnregisterInOptionsUI();
+                settings.UnregisterInOptionsUI();
+                settings = null;
             }
         }
-
         #endregion
     }
 }

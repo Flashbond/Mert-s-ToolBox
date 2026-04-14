@@ -88,6 +88,20 @@ namespace MertsToolBox
         /// Retrieves the current clearance step index.
         /// </summary>
         public int GetCurrentClearanceStepIndex() => m_CurrentClearanceStepIndex;
+        /// <summary>
+        /// Retrieves the step size for diameter adjustments.
+        /// </summary>
+        public int GetDiameterStepSize() => GetCurrentStepValue(m_CurrentDiameterStepIndex, m_DiameterSteps);
+
+        /// <summary>
+        /// Retrieves the step size for turn adjustments.
+        /// </summary>
+        public float GetTurnStepSize() => GetCurrentStepValue(m_CurrentTurnStepIndex, m_TurnSteps);
+
+        /// <summary>
+        /// Retrieves the step size for clearance adjustments.
+        /// </summary>
+        public float GetClearanceStepSize() => GetCurrentStepValue(m_CurrentClearanceStepIndex, m_ClearanceSteps);
 
         /// <summary>
         /// Retrieves the current session diameter, applying default settings if uninitialized.
@@ -178,15 +192,6 @@ namespace MertsToolBox
         }
 
         /// <summary>
-        /// Changes the clearance based on the current step size and direction.
-        /// </summary>
-        public void ChangeClearance(int direction)
-        {
-            float stepSize = GetCurrentStepValue(m_CurrentClearanceStepIndex, m_ClearanceSteps);
-            m_CurrentSessionClearance = math.clamp(GetNextStepAlignedValue(GetCurrentClearance(), stepSize, direction), 7.25f, 15f);
-        }
-
-        /// <summary>
         /// Safely sets the current diameter within legal bounds and queues a preview rebuild.
         /// </summary>
         private void SetCurrentDiameter(int diameter)
@@ -200,6 +205,14 @@ namespace MertsToolBox
 
             m_CurrentSessionDiameter = clamped;
             QueuePreviewRebuild();
+        }
+        /// <summary>
+        /// Changes the clearance based on the current step size and direction.
+        /// </summary>
+        public void ChangeClearance(int direction)
+        {
+            float stepSize = GetCurrentStepValue(m_CurrentClearanceStepIndex, m_ClearanceSteps);
+            m_CurrentSessionClearance = math.clamp(GetNextStepAlignedValue(GetCurrentClearance(), stepSize, direction), 7.25f, 15f);
         }
 
         /// <summary>

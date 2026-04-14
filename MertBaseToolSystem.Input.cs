@@ -15,36 +15,24 @@ namespace MertsToolBox
         protected double m_InputCooldown = 0f;
 
         private Game.Input.ProxyAction m_CachedApplyAction;
-        private bool m_ApplyActionSearched = false;
         #endregion
 
         #region Action & Input Retrieval
         /// <summary>
-        /// Resolves and retrieves the appropriate proxy action for applying changes.
+        /// Resolves and retrieves the appropriate proxy action for applying changes directly from InputManager.
         /// </summary>
         protected Game.Input.ProxyAction GetApplyActionLegal()
         {
-            if (m_ApplyActionSearched) return m_CachedApplyAction;
-
-            m_ApplyActionSearched = true;
-            if (m_ToolSystem == null) return null;
-
-            var flags = System.Reflection.BindingFlags.Instance |
-                        System.Reflection.BindingFlags.NonPublic |
-                        System.Reflection.BindingFlags.Public;
-            var fieldInfo = typeof(Game.Tools.ToolSystem).GetField("m_ApplyAction", flags) ??
-                            typeof(Game.Tools.ToolSystem).GetField("applyAction", flags);
-
-            if (fieldInfo != null)
-            {
-                m_CachedApplyAction = fieldInfo.GetValue(m_ToolSystem) as Game.Input.ProxyAction;
+            if (m_CachedApplyAction != null)
                 return m_CachedApplyAction;
-            }
-            var propInfo = typeof(Game.Tools.ToolSystem).GetProperty("applyAction", flags);
-            if (propInfo != null)
-            {
-                m_CachedApplyAction = propInfo.GetValue(m_ToolSystem) as Game.Input.ProxyAction;
-            }
+
+            if (Game.Input.InputManager.instance == null)
+                return null;
+
+            m_CachedApplyAction = Game.Input.InputManager.instance.FindAction(
+                Game.Input.InputManager.kToolMap,
+                "Apply"
+            );
 
             return m_CachedApplyAction;
         }
@@ -72,17 +60,10 @@ namespace MertsToolBox
                 ExecuteGracefulExit(ToolExitMode.RestoreFromEscape);
                 return;
             }
-
-            if (RealtimeNow < m_SuppressPlacementUntil)
-                return;
-
-            bool isMouseOverUI =
-                Game.Input.InputManager.instance != null &&
-                Game.Input.InputManager.instance.mouseOverUI;
-
-            if (Mouse.current != null &&
-                Mouse.current.leftButton.wasPressedThisFrame &&
-                !isMouseOverUI)
+            
+            Game.Input.ProxyAction applyAction = GetApplyActionLegal();
+        
+            if (applyAction != null && applyAction.WasPerformedThisFrame())
             {
                 if (m_ToolRaycastSystem != null &&
                     m_ToolRaycastSystem.GetRaycastResult(out var result))
@@ -210,11 +191,16 @@ namespace MertsToolBox
             ResetRuntimeStamp();
 
             if (exitMode == ToolExitMode.SilentTabClose)
+            {
+                ApplySilentTabCloseVanillaRecovery();
                 return;
+            }
 
             if (exitMode == ToolExitMode.UserSelectionClose)
+            {
+                ApplySilentTabCloseVanillaRecovery();
                 return;
-
+            }
 
             if (ShouldRestoreLaunchContext(exitMode))
             {
@@ -223,11 +209,11 @@ namespace MertsToolBox
 
                 MertToolState.QueueRestore(exitMode, road, category);
 
-                var defaultTool = World.GetOrCreateSystemManaged<DefaultToolSystem>();
-                if (m_ToolSystem != null && defaultTool != null)
+                var netTool = World.GetOrCreateSystemManaged<NetToolSystem>();
+                if (m_ToolSystem != null && netTool != null)
                 {
                     m_ToolSystem.selected = Entity.Null;
-                    m_ToolSystem.activeTool = defaultTool;
+                    m_ToolSystem.activeTool = netTool;
                 }
 
                 return;
@@ -281,43 +267,61 @@ namespace MertsToolBox
         }
 
         /// <summary>
-        /// Invokes the toolbar UI system to select a specific asset category.
+        /// Silently restores the vanilla toolbar's asset selection memory and releases object tool locks to prevent UI desyncs during category transitions.
         /// </summary>
-        protected void InvokeToolbarSelectAssetCategory(Entity category)
+        protected void ApplySilentTabCloseVanillaRecovery()
         {
-            if (category == Entity.Null)
-                return;
+            try
+            {
+                NetPrefab sessionRoad = MertToolState.LaunchRoadPrefab;
+                if (sessionRoad == null || m_PrefabSystem == null || m_ToolSystem == null || m_NetToolSystem == null)
+                    return;
 
-            var toolbarUISystem = World.GetExistingSystemManaged<Game.UI.InGame.ToolbarUISystem>();
-            if (toolbarUISystem == null)
-                return;
+                var toolbarUISystem = World.GetExistingSystemManaged<Game.UI.InGame.ToolbarUISystem>();
+                Entity roadEntity = m_PrefabSystem.GetEntity(sessionRoad);
 
-            var flags = System.Reflection.BindingFlags.Instance |
-                        System.Reflection.BindingFlags.NonPublic |
-                        System.Reflection.BindingFlags.Public;
+                if (toolbarUISystem != null && roadEntity != Entity.Null)
+                {
+                    var flags = System.Reflection.BindingFlags.Instance |
+                                System.Reflection.BindingFlags.Public |
+                                System.Reflection.BindingFlags.NonPublic;
 
-            var method = toolbarUISystem.GetType().GetMethod("SelectAssetCategory", flags, null, new Type[] { typeof(Entity) }, null);
-            method?.Invoke(toolbarUISystem, new object[] { category });
-        }
+                    var selectAsset = toolbarUISystem.GetType()
+                        .GetMethod("SelectAsset", flags, null, new Type[] { typeof(Entity), typeof(bool) }, null);
 
-        /// <summary>
-        /// Invokes the toolbar UI system to select a specific asset entity.
-        /// </summary>
-        protected void InvokeToolbarSelectAsset(Entity assetEntity, bool updateTool)
-        {
-            if (assetEntity == Entity.Null)
-                return;
+                    if (selectAsset != null)
+                    {
+                        MertToolState.SuppressUiMemoryCapture = true;
+                        MertToolState.SuppressCategoryCapture = true;
 
-            var toolbarUISystem = World.GetExistingSystemManaged<Game.UI.InGame.ToolbarUISystem>();
-            if (toolbarUISystem == null)
-                return;
+                        try
+                        {
+                            selectAsset.Invoke(toolbarUISystem, new object[] { roadEntity, false });
+                        }
+                        finally
+                        {
+                            MertToolState.SuppressUiMemoryCapture = false;
+                            MertToolState.SuppressCategoryCapture = false;
+                        }
+                    }
+                }
 
-            var flags = System.Reflection.BindingFlags.Instance |
-                        System.Reflection.BindingFlags.NonPublic |
-                        System.Reflection.BindingFlags.Public;
+                if (m_ObjectToolSystem != null)
+                {
+                    ModRuntime.TrySetField(m_ObjectToolSystem, "m_SelectedPrefab", null);
+                    ModRuntime.TrySetField(m_ObjectToolSystem, "m_Prefab", null);
+                }
 
-            var method = toolbarUISystem.GetType().GetMethod("SelectAsset", flags, null, new Type[] { typeof(Entity), typeof(bool) }, null);
-            method?.Invoke(toolbarUISystem, new object[] { assetEntity, updateTool });
+                if (m_ToolSystem.activeTool == m_ObjectToolSystem)
+                {
+                    m_ToolSystem.selected = Entity.Null;
+                    m_ToolSystem.activeTool = m_NetToolSystem;
+                }
+            }
+            catch (Exception e)
+            {
+                ModRuntime.Warn("[MertsToolBox] ApplySilentTabCloseVanillaRecovery failed: " + e.Message);
+            }
         }
         #endregion
     }

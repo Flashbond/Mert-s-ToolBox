@@ -12,6 +12,7 @@ namespace MertsToolBox
         TAB_SUPERELLIPSE,
         TAB_GRID
     )]
+    [SettingsUIGroupOrder(GROUP_DEFAULTS, GROUP_CONTROLS)]
     public class Settings : ModSetting
     {
         public const string TAB_CIRCLE = "Circle";
@@ -51,7 +52,6 @@ namespace MertsToolBox
         // -------------------------
         // Circle
         // -------------------------
-
         [SettingsUISection(TAB_CIRCLE, GROUP_DEFAULTS)]
         [SettingsUISlider(min = 48, max = 320, step = 8)]
         public int DefaultCircleDiameter
@@ -83,7 +83,6 @@ namespace MertsToolBox
         // -------------------------
         // Helix
         // -------------------------
-
         [SettingsUISection(TAB_HELIX, GROUP_DEFAULTS)]
         [SettingsUISlider(min = 48, max = 320, step = 8)]
         public int DefaultHelixDiameter
@@ -156,7 +155,6 @@ namespace MertsToolBox
         // -------------------------
         // Super Ellipse
         // -------------------------
-
         [SettingsUISection(TAB_SUPERELLIPSE, GROUP_DEFAULTS)]
         [SettingsUISlider(min = 48, max = 320, step = 8)]
         public int DefaultEllipseWidth
@@ -203,7 +201,6 @@ namespace MertsToolBox
         // -------------------------
         // Grid
         // -------------------------
-
         [SettingsUISection(TAB_GRID, GROUP_DEFAULTS)]
         [SettingsUISlider(min = 1, max = 24, step = 1)]
         public int BlockWidthU
@@ -300,6 +297,7 @@ namespace MertsToolBox
         public override void Apply()
         {
             base.Apply();
+            AssetDatabase.global.SaveSettings();
         }
     }
 }

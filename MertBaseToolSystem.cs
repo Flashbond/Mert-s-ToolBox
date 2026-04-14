@@ -147,9 +147,7 @@ namespace MertsToolBox
 
             ProcessToolInput();
             CheckExitAndPlacementInputs();
-
-            
-
+          
             if (m_PendingObjectToolHandoff && HandlePendingObjectToolHandoff())
                 return;
 

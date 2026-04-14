@@ -15,16 +15,12 @@ namespace MertsToolBox
                 return;
             if (assetCategory == Entity.Null)
                 return;
-
             if (MertToolState.SuppressCategoryCapture)
                 return;
-
             if (MertToolState.SuppressUiAbortDuringRestore)
                 return;
-
             if (!MertToolbarHandoffMemory.IsAnyCustomToolOpen())
                 return;
-
             if (!MertToolbarHandoffMemory.IsRoadsCategory(assetCategory))
                 return;
 
@@ -33,17 +29,7 @@ namespace MertsToolBox
             MertToolState.UserJustChangedAssetCategory = true;
             MertToolState.BlockRoadPrefabFallbackUntilNextRealSelection = true;
 
-            if (MertToolState.TabHandoffFromCategory != Entity.Null &&
-                MertToolState.TabHandoffFromRoad != null &&
-                MertToolState.TabHandoffFromCategory != assetCategory)
-            {
-                _ = MertToolbarHandoffMemory.TryInjectSourceCategoryMemory(
-                    __instance,
-                    MertToolState.TabHandoffFromCategory,
-                    MertToolState.TabHandoffFromRoad);
-            }
-
-            MertToolState.ActivateTabHandoff(assetCategory);
+            MertToolState.ClearTabHandoff();
             MertToolState.OnToolAbortedByUI?.Invoke(ToolExitMode.SilentTabClose);
         }
     }
@@ -60,21 +46,19 @@ namespace MertsToolBox
     public static class ToolbarUISystem_Apply_HandoffPatch
     {
         public static void Prefix(
-   
-        ToolbarUISystem __instance,
-            List<Entity> themes,
-            List<Entity> packs,
-            ref Entity assetMenuEntity,
-            ref Entity assetCategoryEntity,
-            ref Entity assetEntity,
-            ref bool updateTool)
+    ToolbarUISystem __instance,
+    List<Entity> themes,
+    List<Entity> packs,
+    ref Entity assetMenuEntity,
+    ref Entity assetCategoryEntity,
+    ref Entity assetEntity,
+    ref bool updateTool)
         {
-
-            if (!MertToolState.TabHandoffActive && !MertToolState.PendingRestore)
+            if (!MertToolState.PendingRestore)
                 return;
             if (assetCategoryEntity == Entity.Null)
                 return;
-            if (assetCategoryEntity != MertToolState.TabHandoffToCategory)
+            if (assetCategoryEntity != MertToolState.PendingRestoreCategory)
                 return;
             if (!MertToolbarHandoffMemory.IsRoadsCategory(assetCategoryEntity))
                 return;
@@ -85,16 +69,22 @@ namespace MertsToolBox
             if (!incomingIsNull &&
                 MertToolbarHandoffMemory.TryResolvePrefab(assetEntity, out var incomingPrefab))
             {
-                incomingIsStamp = MertToolbarHandoffMemory.IsOurStamp(incomingPrefab);
+                incomingIsStamp = MertToolbarHandoffMemory.IsCurrentStamp(incomingPrefab);
             }
 
             if (!incomingIsNull && !incomingIsStamp)
                 return;
 
-            if (MertToolState.TabHandoffFromRoad == null)
+            if (MertToolState.PendingRestoreRoad == null)
                 return;
 
-            if (!MertToolbarHandoffMemory.TryResolveEntity(MertToolState.TabHandoffFromRoad, out var realRoadEntity))
+            if (!MertToolbarHandoffMemory.TryResolveEntity(MertToolState.PendingRestoreRoad, out var realRoadEntity))
+                return;
+
+            if (!MertToolbarHandoffMemory.TryResolveCategoryFromAsset(realRoadEntity, out var realRoadCategory))
+                return;
+
+            if (realRoadCategory != assetCategoryEntity)
                 return;
 
             assetEntity = realRoadEntity;
@@ -131,12 +121,14 @@ namespace MertsToolBox
                 MertToolState.LastResolvedCategory = category;
             }
 
+            bool anyCustomToolOpen = MertToolbarHandoffMemory.IsAnyCustomToolOpen();
+
             if (MertToolState.TabHandoffActive)
             {
                 MertToolState.ClearTabHandoff();
             }
 
-            if (!MertToolState.SuppressUiAbortDuringRestore)
+            if (anyCustomToolOpen && !MertToolState.SuppressUiAbortDuringRestore)
             {
                 MertToolState.OnToolAbortedByUI?.Invoke(ToolExitMode.UserSelectionClose);
             }
