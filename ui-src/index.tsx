@@ -1,13 +1,14 @@
 ﻿import { ModRegistrar } from "cs2/modding";
 import React, { useEffect } from "react";
 import { trigger, bindValue, useValue } from "cs2/api";
-import { Tooltip } from "cs2/ui";
+
+import { VanillaResolver } from "./VanilliaResolver";
+
 import { CirclePanelSection } from "./CirclePanelSection";
 import { HelixPanelSection } from "./HelixPanelSection";
 import { SuperEllipsePanelSection } from "./SuperEllipsePanelSection";
 import { GridPanelSection } from "./GridPanelSection";
 import { ToolBoxActionHints } from "./ToolBoxActionHints";
-import { useVanillaClasses } from "./VanilliaResolver";
 
 import circleIcon from "./Icons/Circle.svg";
 import helixIcon from "./Icons/Helix.svg";
@@ -47,59 +48,36 @@ function preloadAllToolIcons() {
 }
 
 const ToolBoxModeRow = () => {
-    const { itemClass, labelClass, contentClass, buttonClass, iconClass, iconButtonClass } = useVanillaClasses();
     const activeTool = useValue(activeToolMode$);
 
     return (
-        <div className={itemClass}>
-            <div className={labelClass}>Mert&apos;s ToolBox</div>
+        <VanillaResolver.instance.Section title="Mert's ToolBox">
+            {TOOL_DEFS.map((tool) => {
+                const isSelected = activeTool === tool.id;
 
-            <div className={contentClass}>
-                {TOOL_DEFS.map((tool) => {
-                    const isSelected = activeTool === tool.id;
-
-                    return (
-                        <Tooltip
-                            key={tool.id}
-                            tooltip={
-                                <div>
-                                    <div className="header_HpJ">
-                                        <div className="title_lCJ">{tool.tooltip}</div>
-                                    </div>
-                                </div>
-                            }
-                        >
-                            <button
-                                className={`${buttonClass} ${iconButtonClass} ${isSelected ? "selected" : ""}`}
-                                onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    if (e.button !== 0) return;
-
-                                    trigger("MertsToolBox", "ToggleTool", tool.id);
-                                }}
-                            >
-                                <img
-                                    className={iconClass}
-                                    src={tool.icon}
-                                    alt={tool.id}
-                                    draggable={false}
-                                />
-                            </button>
-                        </Tooltip>
-                    );
-                })}
-            </div>
-        </div>
+                return (
+                    <VanillaResolver.instance.ToolButton
+                        key={tool.id}
+                        src={tool.icon}
+                        selected={isSelected}
+                        tooltip={tool.tooltip} 
+                        focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                        onSelect={() => trigger("MertsToolBox", "ToggleTool", tool.id)}
+                    />
+                );
+            })}
+        </VanillaResolver.instance.Section>
     );
 };
 
 const register: ModRegistrar = (moduleRegistry) => {
+
+    VanillaResolver.setRegistry(moduleRegistry);
+
     const mouseToolPath = "game-ui/game/components/tool-options/mouse-tool-options/mouse-tool-options.tsx";
 
     moduleRegistry.extend(mouseToolPath, "MouseToolOptions", (OriginalMouseToolOptions: any) => {
         return (props: any) => {
-            const vanillaClasses = useVanillaClasses();
             const isAllowed = useValue(isToolBoxAllowed$) as boolean;
             const activeTool = useValue(activeToolMode$) as string;
             const isActive = isAllowed && activeTool !== "None";
@@ -128,10 +106,11 @@ const register: ModRegistrar = (moduleRegistry) => {
                     }}
                 >
                     <ToolBoxActionHints />
-                    <CirclePanelSection vanillaClasses={vanillaClasses} />
-                    <HelixPanelSection vanillaClasses={vanillaClasses} />
-                    <SuperEllipsePanelSection vanillaClasses={vanillaClasses} />
-                    <GridPanelSection vanillaClasses={vanillaClasses} />
+            
+                    <CirclePanelSection />
+                    <HelixPanelSection  />
+                    <SuperEllipsePanelSection />
+                    <GridPanelSection   />
                 </div>
             );
         };

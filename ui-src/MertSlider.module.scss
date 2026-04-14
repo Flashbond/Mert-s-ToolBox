@@ -3,7 +3,7 @@
     flex-direction: row;
     align-items: center;
     width: 100%;
-    gap: 12px;
+    gap: 12rem;
 }
 
 .trackWrapper {
@@ -15,11 +15,11 @@
 
 .track {
     width: 100%;
-    height: 6px;
+    height: 6rem;
     background-color: rgba(255, 255, 255, 0.15);
-    border-radius: 3px;
+    border-radius: 3rem;
     position: relative;
-    box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);
+    box-shadow: inset 0 1rem 2rem rgba(0,0,0,0.3);
 }
 
 .fill {
@@ -28,31 +28,31 @@
     left: 0;
     height: 100%;
     background-color: var(--selectedColor);
-    border-radius: 3px;
+    border-radius: 3rem;
     pointer-events: none;
 }
 
 .thumb {
     position: absolute;
     top: 50%;
-    width: 14px;
-    height: 14px;
+    width: 14rem;
+    height: 14rem;
     background-color: #ffffff;
     border-radius: 50%;
     transform: translate(-50%, -50%);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 2rem 4rem rgba(0, 0, 0, 0.5);
     pointer-events: none;
 }
 
 .trackWrapper:hover .thumb {
     transform: translate(-50%, -50%) scale(1.2);
-    box-shadow: 0 0 8px rgba(30, 131, 170, 0.8);
+    box-shadow: 0 0 8rem rgba(30, 131, 170, 0.8);
 }
 
 .trackWrapper.dragging .thumb {
     transform: translate(-50%, -50%) scale(1.3);
     background-color: #e0f7ff;
-    box-shadow: 0 0 12px rgba(30, 131, 170, 1);
+    box-shadow: 0 0 12rem rgba(30, 131, 170, 1);
 }
 
 .valueDisplay {

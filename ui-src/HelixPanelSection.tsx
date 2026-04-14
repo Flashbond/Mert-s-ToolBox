@@ -1,8 +1,10 @@
 ﻿import React, { useEffect, useState } from "react";
 import { bindValue, trigger, useValue } from "cs2/api";
 import { formatMeters, formatSmart } from "./Formatters";
-// --- GLOBAL BINDINGS (C# TO UI) ---
+// DİKKAT: Resolver import ediliyor!
+import { VanillaResolver } from "./VanilliaResolver";
 
+// --- GLOBAL BINDINGS (C# TO UI) ---
 const activeToolMode$ = bindValue<string>("MertsToolBox", "ActiveTool");
 const toolBoxVisible$ = bindValue<boolean>("MertsToolBox", "IsToolBoxAllowed");
 
@@ -15,41 +17,25 @@ const helixTurnStepIndex$ = bindValue<number>("MertsToolBox", "HelixTurnStepInde
 const helixClearance$ = bindValue<number>("MertsToolBox", "HelixClearance");
 const helixClearanceStepIndex$ = bindValue<number>("MertsToolBox", "HelixClearanceStepIndex");
 
+const helixDiameterStepSize$ = bindValue<number>("MertsToolBox", "HelixDiameterStepSize");
+const helixTurnStepSize$ = bindValue<number>("MertsToolBox", "HelixTurnStepSize");
+const helixClearanceStepSize$ = bindValue<number>("MertsToolBox", "HelixClearanceStepSize");
+
 const showSnapRow$ = bindValue<boolean>("MertsToolBox", "ShowSnapRow", false);
 const isSnapGeometryActive$ = bindValue<boolean>("MertsToolBox", "IsSnapGeometryActive");
 const isSnapNetSideActive$ = bindValue<boolean>("MertsToolBox", "IsSnapNetSideActive");
 const isSnapNetAreaActive$ = bindValue<boolean>("MertsToolBox", "IsSnapNetAreaActive");
 
-
-
 // --- COMPONENT DEFINITION ---
-
-export const HelixPanelSection = ({
-    vanillaClasses
-}: {
-        vanillaClasses: {
-        itemClass: string;
-        labelClass: string;
-        contentClass: string;
-        buttonClass: string;
-        iconClass: string;
-        iconButtonClass: string;
-        startButtonClass: string;
-        endButtonClass: string;
-        numberFieldClass: string;
-        indicatorClass: string;
-    };
-}) => {
+export const HelixPanelSection = () => {
 
     // --- VISIBILITY & LIFECYCLE ---
-
     const activeTool = useValue(activeToolMode$) as string;
     const isToolBoxAllowed = useValue(toolBoxVisible$) as boolean;
 
     const rawShow = isToolBoxAllowed && activeTool === "Helix";
     const [delayedShow, setDelayedShow] = useState(false);
 
-    // Delays component unmounting by 150ms to allow CSS closing animations to finish
     useEffect(() => {
         let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
@@ -67,7 +53,6 @@ export const HelixPanelSection = ({
     }, [rawShow]);
 
     // --- DATA BINDING EVALUATION ---
-
     const diameter = useValue(helixDiameter$) as number;
     const diameterStepIndex = useValue(helixDiameterStepIndex$) as number;
 
@@ -77,32 +62,24 @@ export const HelixPanelSection = ({
     const clearance = useValue(helixClearance$) as number;
     const clearanceStepIndex = useValue(helixClearanceStepIndex$) as number;
 
-    const showSnapRow = useValue(showSnapRow$) as Boolean;
+    const diameterStepSize = useValue(helixDiameterStepSize$) as number;
+    const turnStepSize = useValue(helixTurnStepSize$) as number;
+    const clearanceStepSize = useValue(helixClearanceStepSize$) as number;
+
+    const showSnapRow = useValue(showSnapRow$) as boolean;
     const isSnapGeometryActive = useValue(isSnapGeometryActive$) as boolean;
     const isSnapNetSideActive = useValue(isSnapNetSideActive$) as boolean;
-    const isSnapNetAreaActive = useValue(isSnapNetAreaActive$) as boolean;    
-    
-    const {
-        itemClass,
-        labelClass,
-        contentClass,
-        buttonClass,
-        iconButtonClass,
-        startButtonClass,
-        endButtonClass,
-        numberFieldClass,
-        indicatorClass
-    } = vanillaClasses;
+    const isSnapNetAreaActive = useValue(isSnapNetAreaActive$) as boolean;
 
     // --- RENDER ---
-
     if (!delayedShow) return null;
 
     return (
         <div
             className={`helix-panel-container`}
-            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onMouseDown={(e) => { e.stopPropagation(); }}
+            onContextMenu={(e) => { e.stopPropagation(); }}
+            style={{ display: "flex", flexDirection: "column" }}
         >
             <div className={'panel-header'} style={{
                 fontSize: "16rem",
@@ -114,196 +91,102 @@ export const HelixPanelSection = ({
             }}>Helix Intersection</div>
 
             {/* DIAMETER ROW */}
-            <div className={itemClass}>
-                <div className={labelClass}>Diameter</div>
-                <div className={contentClass}>
-                    <button
-                        className={`${buttonClass} ${iconButtonClass} ${startButtonClass}`}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0) return;
-                            trigger("MertsToolBox", "HelixDiameterDown");
-                        }}
-                    >
-                        <img className={vanillaClasses.iconClass} src="Media/Glyphs/ThickStrokeArrowDown.svg" alt="Down" />
-                    </button>
+            <VanillaResolver.instance.Section title="Diameter">
+                <VanillaResolver.instance.ToolButton
+                    src="Media/Glyphs/ThickStrokeArrowDown.svg"
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    onSelect={() => trigger("MertsToolBox", "HelixDiameterDown")}
+                />
 
-                    <div className={numberFieldClass}>{formatMeters(diameter)}</div>
+                <div className={VanillaResolver.instance.mouseToolOptionsTheme["number-field"]}>{formatMeters(diameter)}</div>
 
-                    <button
-                        className={`${buttonClass} ${iconButtonClass} ${endButtonClass}`}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0) return;
-                            trigger("MertsToolBox", "HelixDiameterUp");
-                        }}
-                    >
-                        <img className={vanillaClasses.iconClass} src="Media/Glyphs/ThickStrokeArrowUp.svg" alt="Up" />
-                    </button>
+                <VanillaResolver.instance.ToolButton
+                    src="Media/Glyphs/ThickStrokeArrowUp.svg"
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    onSelect={() => trigger("MertsToolBox", "HelixDiameterUp")}
+                />
 
-                    <button
-                        className={`${buttonClass} ${iconButtonClass}`}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0) return;
-                            trigger("MertsToolBox", "HelixDiameterStep");
-                        }}
-                        title={`Step Index: ${diameterStepIndex}`}
-                    >
-                        <svg className={indicatorClass} viewBox="0 0 20 16" >
-                            <path d="M0,12h4v4h-4Z" fill={diameterStepIndex >= 0 ? "#1e83aa" : "#424242"}></path>
-                            <path d="M5,8h4v8h-4Z" fill={diameterStepIndex >= 1 ? "#1e83aa" : "#424242"}></path>
-                            <path d="M10,4h4v12h-4Z" fill={diameterStepIndex >= 2 ? "#1e83aa" : "#424242"}></path>
-                            <path d="M15,0h4v16h-4Z" fill={diameterStepIndex >= 3 ? "#1e83aa" : "#424242"}></path>
-                        </svg>
-                    </button>
-                </div>
-            </div>
+                <VanillaResolver.instance.StepToolButton
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    selectedValue={diameterStepIndex}
+                    values={[0, 1, 2, 3]}
+                    tooltip={`Step ${diameterStepSize}`}
+                    onSelect={() => trigger("MertsToolBox", "HelixDiameterStep")}
+                />
+            </VanillaResolver.instance.Section>
 
             {/* TURNS ROW */}
-            <div className={itemClass}>
-                <div className={labelClass}>Turns</div>
-                <div className={contentClass}>
-                    <button
-                        className={`${buttonClass} ${iconButtonClass} ${startButtonClass}`}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0) return;
-                            trigger("MertsToolBox", "HelixTurnsDown");
-                        }}
-                    >
-                        <img className={vanillaClasses.iconClass} src="Media/Glyphs/ThickStrokeArrowDown.svg" alt="Down" />
-                    </button>
+            <VanillaResolver.instance.Section title="Turns">
+                <VanillaResolver.instance.ToolButton
+                    src="Media/Glyphs/ThickStrokeArrowDown.svg"
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    onSelect={() => trigger("MertsToolBox", "HelixTurnsDown")}
+                />
 
-                    <div className={numberFieldClass}>{formatSmart(turns)}</div>
+                <div className={VanillaResolver.instance.mouseToolOptionsTheme["number-field"]}>{formatSmart(turns)}</div>
 
-                    <button
-                        className={`${buttonClass} ${iconButtonClass} ${endButtonClass}`}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0) return;
-                            trigger("MertsToolBox", "HelixTurnsUp");
-                        }}
-                    >
-                        <img className={vanillaClasses.iconClass} src="Media/Glyphs/ThickStrokeArrowUp.svg" alt="Up" />
-                    </button>
-
-                    <button
-                        className={`${buttonClass} ${iconButtonClass}`}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0) return;
-                            trigger("MertsToolBox", "HelixTurnsStep");
-                        }}
-                        title={`Step Index: ${turnStepIndex}`}
-                    >
-                        <svg className={indicatorClass} viewBox="0 0 20 16" >
-                            <path d="M0,12h4v4h-4Z" fill={turnStepIndex >= 0 ? "#1e83aa" : "#424242"}></path>
-                            <path d="M5,8h4v8h-4Z" fill={turnStepIndex >= 1 ? "#1e83aa" : "#424242"}></path>
-                            <path d="M10,4h4v12h-4Z" fill={turnStepIndex >= 2 ? "#1e83aa" : "#424242"}></path>
-                            <path d="M15,0h4v16h-4Z" fill={turnStepIndex >= 3 ? "#1e83aa" : "#424242"}></path>
-                        </svg>
-                    </button>
-                </div>
-            </div>
+                <VanillaResolver.instance.ToolButton
+                    src="Media/Glyphs/ThickStrokeArrowUp.svg"
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    onSelect={() => trigger("MertsToolBox", "HelixTurnsUp")}
+                />
+                <VanillaResolver.instance.StepToolButton
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    selectedValue={turnStepIndex}
+                    values={[0, 1, 2, 3]}
+                    tooltip={`Step ${turnStepSize}`}
+                    onSelect={() => trigger("MertsToolBox", "HelixTurnsStep")}
+                />
+            </VanillaResolver.instance.Section>
 
             {/* CLEARANCE ROW */}
-            <div className={itemClass}>
-                <div className={labelClass}>Clearance</div>
-                <div className={contentClass}>
-                    <button
-                        className={`${buttonClass} ${iconButtonClass} ${startButtonClass}`}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0) return;
-                            trigger("MertsToolBox", "HelixClearanceDown");
-                        }}
-                    >
-                        <img className={vanillaClasses.iconClass} src="Media/Glyphs/ThickStrokeArrowDown.svg" alt="Down" />
-                    </button>
+            <VanillaResolver.instance.Section title="Clearance">
+                <VanillaResolver.instance.ToolButton
+                    src="Media/Glyphs/ThickStrokeArrowDown.svg"
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    onSelect={() => trigger("MertsToolBox", "HelixClearanceDown")}
+                />
 
-                    <div className={numberFieldClass}>{formatMeters(clearance)}</div>
+                <div className={VanillaResolver.instance.mouseToolOptionsTheme["number-field"]}>{formatMeters(clearance)}</div>
 
-                    <button
-                        className={`${buttonClass} ${iconButtonClass} ${endButtonClass}`}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0) return;
-                            trigger("MertsToolBox", "HelixClearanceUp");
-                        }}
-                    >
-                        <img className={vanillaClasses.iconClass} src="Media/Glyphs/ThickStrokeArrowUp.svg" alt="Up" />
-                    </button>
+                <VanillaResolver.instance.ToolButton
+                    src="Media/Glyphs/ThickStrokeArrowUp.svg"
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    onSelect={() => trigger("MertsToolBox", "HelixClearanceUp")}
+                />
+                <VanillaResolver.instance.StepToolButton
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    selectedValue={clearanceStepIndex}
+                    values={[0, 1, 2, 3]}
+                    tooltip={`Step ${clearanceStepSize}`}
+                    onSelect={() => trigger("MertsToolBox", "HelixClearanceStep")}
+                />
+            </VanillaResolver.instance.Section>
 
-                    <button
-                        className={`${buttonClass} ${iconButtonClass}`}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0) return;
-                            trigger("MertsToolBox", "HelixClearanceStep");
-                        }}
-                        title={`Step Index: ${clearanceStepIndex}`}
-                    >
-                        <svg className={indicatorClass} viewBox="0 0 20 16" >
-                            <path d="M0,12h4v4h-4Z" fill={clearanceStepIndex >= 0 ? "#1e83aa" : "#424242"}></path>
-                            <path d="M5,8h4v8h-4Z" fill={clearanceStepIndex >= 1 ? "#1e83aa" : "#424242"}></path>
-                            <path d="M10,4h4v12h-4Z" fill={clearanceStepIndex >= 2 ? "#1e83aa" : "#424242"}></path>
-                            <path d="M15,0h4v16h-4Z" fill={clearanceStepIndex >= 3 ? "#1e83aa" : "#424242"}></path>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-
+            {/* SNAP ROW (CONDITIONAL RENDER) */}
             {showSnapRow && (
-                <div className={itemClass}>
-                    <div className={labelClass}>Snap</div>
-                    <div className={contentClass}>
-                        <button
-                            className={`${buttonClass} ${iconButtonClass} ${isSnapGeometryActive ? "selected" : ""}`}
-                            onMouseDown={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                if (e.button !== 0) return;
-                                trigger("MertsToolBox", "HelixToggleSnap", "Geometry");
-                            }}
-                        >
-                            <img className={vanillaClasses.iconClass} src="Media/Tools/Snap Options/ExistingGeometry.svg" alt="Geometry" />
-                        </button>
+                <VanillaResolver.instance.Section title="Snap">
+                    <VanillaResolver.instance.ToolButton
+                        src="Media/Tools/Snap Options/ExistingGeometry.svg"
+                        selected={isSnapGeometryActive}
+                        focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                        onSelect={() => trigger("MertsToolBox", "HelixToggleSnap", "Geometry")}
+                    />
 
-                        <button
-                            className={`${buttonClass} ${iconButtonClass} ${isSnapNetSideActive ? "selected" : ""}`}
-                            onMouseDown={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                if (e.button !== 0) return;
-                                trigger("MertsToolBox", "HelixToggleSnap", "NetSide");
-                            }}
-                        >
-                            <img className={vanillaClasses.iconClass} src="Media/Tools/Snap Options/NetSide.svg" alt="Road Side" />
-                        </button>
+                    <VanillaResolver.instance.ToolButton
+                        src="Media/Tools/Snap Options/NetSide.svg"
+                        selected={isSnapNetSideActive}
+                        focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                        onSelect={() => trigger("MertsToolBox", "HelixToggleSnap", "NetSide")}
+                    />
 
-                        <button
-                            className={`${buttonClass} ${iconButtonClass} ${isSnapNetAreaActive ? "selected" : ""}`}
-                            onMouseDown={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                if (e.button !== 0) return;
-                                trigger("MertsToolBox", "HelixToggleSnap", "NetArea");
-                            }}
-                        >
-                            <img className={vanillaClasses.iconClass} src="Media/Tools/Snap Options/NetArea.svg" alt="Road Node" />
-                        </button>
-                    </div>
-                </div>
+                    <VanillaResolver.instance.ToolButton
+                        src="Media/Tools/Snap Options/NetArea.svg"
+                        selected={isSnapNetAreaActive}
+                        focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                        onSelect={() => trigger("MertsToolBox", "HelixToggleSnap", "NetArea")}
+                    />
+                </VanillaResolver.instance.Section>
             )}
         </div>
     );

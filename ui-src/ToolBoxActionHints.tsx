@@ -104,7 +104,7 @@ export const ToolBoxActionHints = () => {
                     {showCtrlWheelHint && (
                         <span className="hint_l_F">
                             <span className="modifier_iDc">
-                                <span className="button-text_fw1 button_ehL" style={{ padding: "0 0.6em 0 0.7em" }}>Ctrl</span>
+                                <span className="button-text_fw1 button_ehL" style={{ padding: "0 0.6em 0 0.6em" }}>Ctrl</span>
                             </span>
                             <span className="binding_dc_">
                                 <img className="hint-icon_VtT" src="Media/Mouse/Scrollwheel.svg" alt="Wheel" />

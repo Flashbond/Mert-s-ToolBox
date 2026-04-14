@@ -3,8 +3,9 @@ import { bindValue, trigger, useValue } from "cs2/api";
 import alternatingIcon from "./Icons/Alternating.svg";
 import orientationIcon from "./Icons/Orientation.svg";
 import { formatUnits, formatSmart } from "./Formatters";
-// --- GLOBAL BINDINGS (C# TO UI) ---
+import { VanillaResolver } from "./VanilliaResolver";
 
+// --- GLOBAL BINDINGS (C# TO UI) ---
 const activeToolMode$ = bindValue<string>("MertsToolBox", "ActiveTool");
 const toolBoxVisible$ = bindValue<boolean>("MertsToolBox", "IsToolBoxAllowed");
 
@@ -24,33 +25,15 @@ const isSnapNetAreaActive$ = bindValue<boolean>("MertsToolBox", "IsSnapNetAreaAc
 const gridIsOneWaySupported$ = bindValue<boolean>("MertsToolBox", "GridIsOneWaySupported");
 
 // --- COMPONENT DEFINITION ---
-
-export const GridPanelSection = ({
-    vanillaClasses
-}: {
-        vanillaClasses: {
-        itemClass: string;
-        labelClass: string;
-        contentClass: string;
-        buttonClass: string;
-        iconClass: string;
-        iconButtonClass: string;
-        startButtonClass: string;
-        endButtonClass: string;
-        numberFieldClass: string;
-        indicatorClass: string;
-    };
-}) => {
+export const GridPanelSection = () => {
 
     // --- VISIBILITY & LIFECYCLE ---
-
     const activeTool = useValue(activeToolMode$) as string;
     const isToolBoxAllowed = useValue(toolBoxVisible$) as boolean;
 
     const rawShow = isToolBoxAllowed && activeTool === "Grid";
     const [delayedShow, setDelayedShow] = useState(false);
 
-    // Delays component unmounting by 150ms to allow CSS closing animations to finish
     useEffect(() => {
         let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
@@ -68,7 +51,6 @@ export const GridPanelSection = ({
     }, [rawShow]);
 
     // --- DATA BINDING EVALUATION ---
-
     const blockWidth = useValue(gridBlockWidth$) as number;
     const blockLength = useValue(gridBlockLength$) as number;
     const columns = useValue(gridColumns$) as number;
@@ -78,32 +60,20 @@ export const GridPanelSection = ({
     const isOrientationLeftBottom = useValue(gridOrientationLeftBottom$) as boolean;
     const isOneWaySupported = useValue(gridIsOneWaySupported$) as boolean;
 
-    const showSnapRow = useValue(showSnapRow$) as Boolean;
+    const showSnapRow = useValue(showSnapRow$) as boolean;
     const isSnapGeometryActive = useValue(isSnapGeometryActive$) as boolean;
     const isSnapNetSideActive = useValue(isSnapNetSideActive$) as boolean;
     const isSnapNetAreaActive = useValue(isSnapNetAreaActive$) as boolean;
-    
-    const {
-        itemClass,
-        labelClass,
-        contentClass,
-        buttonClass,
-        iconClass,
-        iconButtonClass,
-        startButtonClass,
-        endButtonClass,
-        numberFieldClass
-    } = vanillaClasses;
 
     // --- RENDER ---
-
     if (!delayedShow) return null;
 
     return (
         <div
             className={`grid-panel-container`}
-            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onMouseDown={(e) => { e.stopPropagation(); }}
+            onContextMenu={(e) => { e.stopPropagation(); }}
+            style={{ display: "flex", flexDirection: "column" }}
         >
             <div className={'panel-header'} style={{
                 fontSize: "16rem",
@@ -115,209 +85,126 @@ export const GridPanelSection = ({
             }}>Smart Grid</div>
 
             {/* BLOCK WIDTH ROW */}
-            <div className={itemClass}>
-                <div className={labelClass}>Block Width</div>
-                <div className={contentClass}>
-                    <button
-                        className={`${buttonClass} ${iconButtonClass} ${startButtonClass}`}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0) return;
-                            trigger("MertsToolBox", "GridBlockWidthDown");
-                        }}
-                    >
-                        <img className={iconClass} src="Media/Glyphs/ThickStrokeArrowDown.svg" alt="Down" />
-                    </button>
+            <VanillaResolver.instance.Section title="Block Width">
+                <VanillaResolver.instance.ToolButton
+                    src="Media/Glyphs/ThickStrokeArrowDown.svg"
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    onSelect={() => trigger("MertsToolBox", "GridBlockWidthDown")}
+                />
 
-                    <div className={numberFieldClass}>{formatUnits(blockWidth)}</div>
-
-                    <button
-                        className={`${buttonClass} ${iconButtonClass} ${endButtonClass}`}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0) return;
-                            trigger("MertsToolBox", "GridBlockWidthUp");
-                        }}
-                    >
-                        <img className={iconClass} src="Media/Glyphs/ThickStrokeArrowUp.svg" alt="Up" />
-                    </button>
+                <div className={VanillaResolver.instance.mouseToolOptionsTheme["number-field"]}>
+                    {formatUnits(blockWidth)}
                 </div>
-            </div>
+
+                <VanillaResolver.instance.ToolButton
+                    src="Media/Glyphs/ThickStrokeArrowUp.svg"
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    onSelect={() => trigger("MertsToolBox", "GridBlockWidthUp")}
+                />
+            </VanillaResolver.instance.Section>
 
             {/* BLOCK DEPTH ROW */}
-            <div className={itemClass}>
-                <div className={labelClass}>Block Depth</div>
-                <div className={contentClass}>
-                    <button
-                        className={`${buttonClass} ${iconButtonClass} ${startButtonClass}`}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0) return;
-                            trigger("MertsToolBox", "GridBlockLengthDown");
-                        }}
-                    >
-                        <img className={iconClass} src="Media/Glyphs/ThickStrokeArrowDown.svg" alt="Down" />
-                    </button>
+            <VanillaResolver.instance.Section title="Block Depth">
+                <VanillaResolver.instance.ToolButton
+                    src="Media/Glyphs/ThickStrokeArrowDown.svg"
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    onSelect={() => trigger("MertsToolBox", "GridBlockLengthDown")}
+                />
 
-                    <div className={numberFieldClass}>{formatUnits(blockLength)}</div>
-
-                    <button
-                        className={`${buttonClass} ${iconButtonClass} ${endButtonClass}`}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0) return;
-                            trigger("MertsToolBox", "GridBlockLengthUp");
-                        }}
-                    >
-                        <img className={iconClass} src="Media/Glyphs/ThickStrokeArrowUp.svg" alt="Up" />
-                    </button>
+                <div className={VanillaResolver.instance.mouseToolOptionsTheme["number-field"]}>
+                    {formatUnits(blockLength)}
                 </div>
-            </div>
+
+                <VanillaResolver.instance.ToolButton
+                    src="Media/Glyphs/ThickStrokeArrowUp.svg"
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    onSelect={() => trigger("MertsToolBox", "GridBlockLengthUp")}
+                />
+            </VanillaResolver.instance.Section>
 
             {/* COLUMNS ROW */}
-            <div className={itemClass}>
-                <div className={labelClass}>Columns</div>
-                <div className={contentClass}>
-                    <button
-                        className={`${buttonClass} ${iconButtonClass} ${startButtonClass}`}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0) return;
-                            trigger("MertsToolBox", "GridColumnsDown");
-                        }}
-                    >
-                        <img className={iconClass} src="Media/Glyphs/ThickStrokeArrowDown.svg" alt="Down" />
-                    </button>
+            <VanillaResolver.instance.Section title="Columns">
+                <VanillaResolver.instance.ToolButton
+                    src="Media/Glyphs/ThickStrokeArrowDown.svg"
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    onSelect={() => trigger("MertsToolBox", "GridColumnsDown")}
+                />
 
-                    <div className={numberFieldClass}>{formatSmart(columns)}</div>
-
-                    <button
-                        className={`${buttonClass} ${iconButtonClass} ${endButtonClass}`}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0) return;
-                            trigger("MertsToolBox", "GridColumnsUp");
-                        }}
-                    >
-                        <img className={iconClass} src="Media/Glyphs/ThickStrokeArrowUp.svg" alt="Up" />
-                    </button>
+                <div className={VanillaResolver.instance.mouseToolOptionsTheme["number-field"]}>
+                    {formatSmart(columns)}
                 </div>
-            </div>
+
+                <VanillaResolver.instance.ToolButton
+                    src="Media/Glyphs/ThickStrokeArrowUp.svg"
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    onSelect={() => trigger("MertsToolBox", "GridColumnsUp")}
+                />
+            </VanillaResolver.instance.Section>
 
             {/* ROWS ROW */}
-            <div className={itemClass}>
-                <div className={labelClass}>Rows</div>
-                <div className={contentClass}>
-                    <button
-                        className={`${buttonClass} ${iconButtonClass} ${startButtonClass}`}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0) return;
-                            trigger("MertsToolBox", "GridRowsDown");
-                        }}
-                    >
-                        <img className={iconClass} src="Media/Glyphs/ThickStrokeArrowDown.svg" alt="Down" />
-                    </button>
+            <VanillaResolver.instance.Section title="Rows">
+                <VanillaResolver.instance.ToolButton
+                    src="Media/Glyphs/ThickStrokeArrowDown.svg"
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    onSelect={() => trigger("MertsToolBox", "GridRowsDown")}
+                />
 
-                    <div className={numberFieldClass}>{formatSmart(rows)}</div>
-
-                    <button
-                        className={`${buttonClass} ${iconButtonClass} ${endButtonClass}`}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0) return;
-                            trigger("MertsToolBox", "GridRowsUp");
-                        }}
-                    >
-                        <img className={iconClass} src="Media/Glyphs/ThickStrokeArrowUp.svg" alt="Up" />
-                    </button>
+                <div className={VanillaResolver.instance.mouseToolOptionsTheme["number-field"]}>
+                    {formatSmart(rows)}
                 </div>
-            </div>
+
+                <VanillaResolver.instance.ToolButton
+                    src="Media/Glyphs/ThickStrokeArrowUp.svg"
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    onSelect={() => trigger("MertsToolBox", "GridRowsUp")}
+                />
+            </VanillaResolver.instance.Section>
 
             {/* ONE-WAY PATTERN ROW */}
-            <div className={itemClass}>
-                <div className={labelClass}>Pattern (One-Way Roads)</div>
-                <div className={contentClass}>
-                    <button
-                        className={`${buttonClass} ${iconButtonClass} ${isAlternating ? "selected" : ""}`}
-                        disabled={!isOneWaySupported}
-                        style={{ opacity: isOneWaySupported ? 1 : 0.3, cursor: isOneWaySupported ? 'pointer' : 'not-allowed' }}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0 || !isOneWaySupported) return;
-                            trigger("MertsToolBox", "GridToggleAlternating");
-                        }}
-                        title={isOneWaySupported ? "Alternating" : "Requires a one-way road"}
-                    >
-                        <img className={iconClass} src={alternatingIcon} alt="Alternating" draggable={false} />
-                    </button>
+            <VanillaResolver.instance.Section title="Pattern (One-Way Roads)">
+                <VanillaResolver.instance.ToolButton
+                    src={alternatingIcon}
+                    selected={isAlternating}
+                    disabled={!isOneWaySupported}
+                    tooltip={isOneWaySupported ? "Alternating" : "Requires a one-way road"}
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    onSelect={() => trigger("MertsToolBox", "GridToggleAlternating")}
+                />
 
-                    <button
-                        className={`${buttonClass} ${iconButtonClass} ${isOrientationLeftBottom ? "selected" : ""}`}
-                        disabled={!isOneWaySupported}
-                        style={{ opacity: isOneWaySupported ? 1 : 0.3, cursor: isOneWaySupported ? 'pointer' : 'not-allowed' }}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0 || !isOneWaySupported) return;
-                            trigger("MertsToolBox", "GridToggleOrientation");
-                        }}
-                        title={isOneWaySupported ? "Orientation" : "Requires a one-way road"}
-                    >
-                        <img className={iconClass} src={orientationIcon} alt="Orientation" draggable={false} />
-                    </button>
-                </div>
-            </div>
+                <VanillaResolver.instance.ToolButton
+                    src={orientationIcon}
+                    selected={isOrientationLeftBottom}
+                    disabled={!isOneWaySupported}
+                    tooltip={isOneWaySupported ? "Orientation" : "Requires a one-way road"}
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    onSelect={() => trigger("MertsToolBox", "GridToggleOrientation")}
+                />
+            </VanillaResolver.instance.Section>
+
+            {/* SNAP ROW */}
             {showSnapRow && (
-                <div className={itemClass}>
-                <div className={labelClass}>Snap</div>
-                    <div className={contentClass}>
-                    <button
-                        className={`${buttonClass} ${iconButtonClass} ${isSnapGeometryActive ? "selected" : ""}`}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0) return;
-                            trigger("MertsToolBox", "GridToggleSnap", "Geometry");
-                        }}
-                    >
-                        <img src="Media/Tools/Snap Options/ExistingGeometry.svg" className={iconClass} alt="Geometry" />
-                    </button>
+                <VanillaResolver.instance.Section title="Snap">
+                    <VanillaResolver.instance.ToolButton
+                        src="Media/Tools/Snap Options/ExistingGeometry.svg"
+                        selected={isSnapGeometryActive}
+                        focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                        onSelect={() => trigger("MertsToolBox", "GridToggleSnap", "Geometry")}
+                    />
 
-                    <button
-                        className={`${buttonClass} ${iconButtonClass} ${isSnapNetSideActive ? "selected" : ""}`}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0) return;
-                            trigger("MertsToolBox", "GridToggleSnap", "NetSide");
-                        }}
-                    >
-                        <img src="Media/Tools/Snap Options/NetSide.svg" className={iconClass} alt="Road Side" />
-                    </button>
+                    <VanillaResolver.instance.ToolButton
+                        src="Media/Tools/Snap Options/NetSide.svg"
+                        selected={isSnapNetSideActive}
+                        focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                        onSelect={() => trigger("MertsToolBox", "GridToggleSnap", "NetSide")}
+                    />
 
-                    <button
-                        className={`${buttonClass} ${iconButtonClass} ${isSnapNetAreaActive ? "selected" : ""}`}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (e.button !== 0) return;
-                            trigger("MertsToolBox", "GridToggleSnap", "NetArea");
-                        }}
-                    >
-                        <img src="Media/Tools/Snap Options/NetArea.svg" className={iconClass} alt="Road Node" />
-                    </button>
-                </div>
-            </div>
+                    <VanillaResolver.instance.ToolButton
+                        src="Media/Tools/Snap Options/NetArea.svg"
+                        selected={isSnapNetAreaActive}
+                        focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                        onSelect={() => trigger("MertsToolBox", "GridToggleSnap", "NetArea")}
+                    />
+                </VanillaResolver.instance.Section>
             )}
         </div>
     );
