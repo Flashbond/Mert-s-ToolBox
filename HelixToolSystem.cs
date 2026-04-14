@@ -190,6 +190,15 @@ namespace MertsToolBox
             float stepSize = GetCurrentStepValue(m_CurrentTurnStepIndex, m_TurnSteps);
             SetCurrentTurns(GetNextStepAlignedValue(GetCurrentTurns(), stepSize, direction));
         }
+    
+        /// <summary>
+        /// Changes the clearance based on the current step size and direction.
+        /// </summary>
+        public void ChangeClearance(int direction)
+        {
+            float stepSize = GetCurrentStepValue(m_CurrentClearanceStepIndex, m_ClearanceSteps);
+            SetCurrentClearance(GetNextStepAlignedValue(GetCurrentClearance(), stepSize, direction));
+        }
 
         /// <summary>
         /// Safely sets the current diameter within legal bounds and queues a preview rebuild.
@@ -206,19 +215,30 @@ namespace MertsToolBox
             m_CurrentSessionDiameter = clamped;
             QueuePreviewRebuild();
         }
+
         /// <summary>
-        /// Changes the clearance based on the current step size and direction.
+        /// Clamps and applies the specified number of turns and queues a preview rebuild.
         /// </summary>
-        public void ChangeClearance(int direction)
+        private void SetCurrentTurns(float turns)
         {
-            float stepSize = GetCurrentStepValue(m_CurrentClearanceStepIndex, m_ClearanceSteps);
-            m_CurrentSessionClearance = math.clamp(GetNextStepAlignedValue(GetCurrentClearance(), stepSize, direction), 7.25f, 15f);
+            float clamped = math.clamp(turns, 0.5f, 12f);
+            if (math.abs(m_CurrentSessionTurns - clamped) < 0.001f) return;
+
+            m_CurrentSessionTurns = clamped;
+            QueuePreviewRebuild(); // <-- Canlı güncellemeyi sağlayan sihirli satır
         }
 
         /// <summary>
-        /// Clamps and applies the specified number of turns to the current session state.
+        /// Safely sets the current clearance and queues a preview rebuild.
         /// </summary>
-        private void SetCurrentTurns(float turns) => m_CurrentSessionTurns = math.clamp(turns, 0.5f, 12f);
+        private void SetCurrentClearance(float clearance)
+        {
+            float clamped = math.clamp(clearance, 7.25f, 15f);
+            if (math.abs(m_CurrentSessionClearance - clamped) < 0.001f) return;
+
+            m_CurrentSessionClearance = clamped;
+            QueuePreviewRebuild(); // <-- Canlı güncellemeyi sağlayan sihirli satır
+        }
         #endregion
 
         #region Geometry Generation

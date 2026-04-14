@@ -187,7 +187,9 @@ namespace MertsToolBox
         {
             float nextSlider = math.clamp(math.abs(targetSlider - 8.0f) < 0.05f ? 8.0f : targetSlider, 1.0f, 15.0f);
             if (math.abs(GetCurrentNSliderValue() - nextSlider) < 0.01f) return;
+
             m_N = 0.895f / (1.0f - math.min(0.105f + ((nextSlider - 1.0f) / 14.0f) * 0.895f, 0.999f));
+            QueuePreviewRebuild();
         }
         #endregion
 
