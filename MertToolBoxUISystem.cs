@@ -352,32 +352,6 @@ namespace MertsToolBox
             {
                 CloseTools(ToolExitMode.UserSelectionClose);
             }
-            if (tool == objectTool)
-            {
-                bool anyCustomToolOpen =
-                    (m_CircleTool != null && m_CircleTool.ToolEnabled) ||
-                    (m_HelixTool != null && m_HelixTool.ToolEnabled) ||
-                    (m_SuperEllipseTool != null && m_SuperEllipseTool.ToolEnabled) ||
-                    (m_GridTool != null && m_GridTool.ToolEnabled);
-
-                if (!anyCustomToolOpen &&
-                    !MertToolState.PendingRestore &&
-                    !MertToolState.TabHandoffActive &&
-                    !MertToolState.HasReleasedStaleObjectToolThisFrame)
-                {
-                    MertToolState.HasReleasedStaleObjectToolThisFrame = true;
-
-                    if (m_ToolSystem != null && netTool != null)
-                    {
-                        m_ToolSystem.selected = Entity.Null;
-                        m_ToolSystem.activeTool = netTool;
-                    }
-
-                    return;
-                }
-
-                return;
-            }
         }
         #endregion
 

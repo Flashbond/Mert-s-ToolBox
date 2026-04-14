@@ -190,17 +190,26 @@ namespace MertsToolBox
             ToolEnabled = false;
             ResetRuntimeStamp();
 
+            try
+            {
+                if (m_ObjectToolSystem != null)
+                {
+                    ModRuntime.TrySetField(m_ObjectToolSystem, "m_SelectedPrefab", null);
+                    ModRuntime.TrySetField(m_ObjectToolSystem, "m_Prefab", null);
+                }
+            }
+            catch
+            {
+            }
+
             if (exitMode == ToolExitMode.SilentTabClose)
             {
-                ApplySilentTabCloseVanillaRecovery();
+                RefreshRoadToolbarSelectionWithoutToolSwitch();
                 return;
             }
 
             if (exitMode == ToolExitMode.UserSelectionClose)
-            {
-                ApplySilentTabCloseVanillaRecovery();
                 return;
-            }
 
             if (ShouldRestoreLaunchContext(exitMode))
             {
@@ -269,58 +278,52 @@ namespace MertsToolBox
         /// <summary>
         /// Silently restores the vanilla toolbar's asset selection memory and releases object tool locks to prevent UI desyncs during category transitions.
         /// </summary>
-        protected void ApplySilentTabCloseVanillaRecovery()
+        protected void RefreshRoadToolbarSelectionWithoutToolSwitch()
         {
             try
             {
-                NetPrefab sessionRoad = MertToolState.LaunchRoadPrefab;
-                if (sessionRoad == null || m_PrefabSystem == null || m_ToolSystem == null || m_NetToolSystem == null)
+                if (m_PrefabSystem == null)
+                    return;
+
+                NetPrefab road = MertToolState.LaunchRoadPrefab ?? MertToolState.LastResolvedRoadPrefab;
+                if (road == null)
+                    return;
+
+                Entity roadEntity = m_PrefabSystem.GetEntity(road);
+                if (roadEntity == Entity.Null)
                     return;
 
                 var toolbarUISystem = World.GetExistingSystemManaged<Game.UI.InGame.ToolbarUISystem>();
-                Entity roadEntity = m_PrefabSystem.GetEntity(sessionRoad);
+                if (toolbarUISystem == null)
+                    return;
 
-                if (toolbarUISystem != null && roadEntity != Entity.Null)
+                var flags = System.Reflection.BindingFlags.Instance |
+                            System.Reflection.BindingFlags.Public |
+                            System.Reflection.BindingFlags.NonPublic;
+
+                var selectAsset = toolbarUISystem.GetType()
+                    .GetMethod("SelectAsset", flags, null, new Type[] { typeof(Entity), typeof(bool) }, null);
+
+                if (selectAsset == null)
+                    return;
+
+                MertToolState.SuppressUiMemoryCapture = true;
+                MertToolState.SuppressCategoryCapture = true;
+
+                try
                 {
-                    var flags = System.Reflection.BindingFlags.Instance |
-                                System.Reflection.BindingFlags.Public |
-                                System.Reflection.BindingFlags.NonPublic;
-
-                    var selectAsset = toolbarUISystem.GetType()
-                        .GetMethod("SelectAsset", flags, null, new Type[] { typeof(Entity), typeof(bool) }, null);
-
-                    if (selectAsset != null)
-                    {
-                        MertToolState.SuppressUiMemoryCapture = true;
-                        MertToolState.SuppressCategoryCapture = true;
-
-                        try
-                        {
-                            selectAsset.Invoke(toolbarUISystem, new object[] { roadEntity, false });
-                        }
-                        finally
-                        {
-                            MertToolState.SuppressUiMemoryCapture = false;
-                            MertToolState.SuppressCategoryCapture = false;
-                        }
-                    }
+                    // updateTool=false: toolbar highlight/hafıza düzelsin, tool zorlanmasın
+                    selectAsset.Invoke(toolbarUISystem, new object[] { roadEntity, false });
                 }
-
-                if (m_ObjectToolSystem != null)
+                finally
                 {
-                    ModRuntime.TrySetField(m_ObjectToolSystem, "m_SelectedPrefab", null);
-                    ModRuntime.TrySetField(m_ObjectToolSystem, "m_Prefab", null);
-                }
-
-                if (m_ToolSystem.activeTool == m_ObjectToolSystem)
-                {
-                    m_ToolSystem.selected = Entity.Null;
-                    m_ToolSystem.activeTool = m_NetToolSystem;
+                    MertToolState.SuppressUiMemoryCapture = false;
+                    MertToolState.SuppressCategoryCapture = false;
                 }
             }
             catch (Exception e)
             {
-                ModRuntime.Warn("[MertsToolBox] ApplySilentTabCloseVanillaRecovery failed: " + e.Message);
+                UnityEngine.Debug.LogWarning("[MertsToolBox] RefreshRoadToolbarSelectionWithoutToolSwitch failed: " + e.Message);
             }
         }
         #endregion
