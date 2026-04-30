@@ -246,14 +246,12 @@ namespace MertsToolBox
 
                 return 10f;
             }));
-
             AddBinding(new ValueBinding<float[]>(
                 ModId,
                 "ElevationStepArray",
                 m_Circle?.GetElevationStepArray() ?? new float[] { 10f, 5f, 2.5f, 1.25f },
                 new ArrayWriter<float>()
             ));
-
             AddUpdateBinding(new MertPolledBinding<float>(ModId, "ElevationValue", () =>
             {
                 if (m_Circle != null && m_Circle.ToolEnabled) return m_Circle.GetCurrentNetToolElevation();
