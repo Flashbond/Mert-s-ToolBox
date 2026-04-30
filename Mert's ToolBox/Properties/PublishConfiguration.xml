@@ -45,11 +45,10 @@
 		* Live elevation change added.
 		* Added missing UI tooltips.
 		* Refurbished icons.
-		* Tested with 1.5.7f1 update.
 	</ChangeLog>
 
 	<!--External links-->
-	<ExternalLink Type="github" Url="https://github.com/Flashbond/Mert-s-ToolBox" />
+	<ExternalLink Type="github" Url="https://github.com/Flashbond/Mert-s-ToolBox/tree/beta-test/" />
 	<!-- İstersen YouTube ekle -->
 
 	<!--Supported values Public, Private, Unlisted-->
