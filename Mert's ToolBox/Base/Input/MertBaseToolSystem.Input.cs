@@ -666,7 +666,5 @@ namespace MertsToolBox
             return EstimateRoadWidth(roadPrefab);
         }
         #endregion
-
-
     }
 }
