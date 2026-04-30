@@ -1,0 +1,23 @@
+# Üst dizinlerdeki ayarların bu dosyayı ezmesini engeller
+root = true
+
+# Tüm C# ve Visual Basic dosyaları için geçerli kurallar
+[*.{cs,vb}]
+
+#### Performans ve Temizlik Kuralları (İstediğin CA kodları) ####
+
+# CA1811: Çağrılmayan özel (private) metotları uyar
+dotnet_diagnostic.CA1811.severity = warning
+
+# CA1823: Kullanılmayan özel (private) alanları (fields) uyar
+dotnet_diagnostic.CA1823.severity = warning
+
+# CA1812: Hiç örneği oluşturulmayan dahili (internal) sınıfları uyar
+dotnet_diagnostic.CA1812.severity = warning
+
+# CA1801: Kullanılmayan parametreleri uyar
+dotnet_diagnostic.CA1801.severity = warning
+
+#### Ekstra Öneri: Kod Stili ####
+# Kullanılmayan 'using' direktiflerini silmek için (Visual Studio bunu grileştirir)
+dotnet_diagnostic.IDE0005.severity = warning

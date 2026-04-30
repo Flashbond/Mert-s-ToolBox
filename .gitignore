@@ -1,0 +1,10 @@
+[Bb]in/
+[Oo]bj/
+.vs/
+node_modules/
+node_modules*/
+ui-dist/
+ui-dist*/
+*.user
+*.log
+*.txt

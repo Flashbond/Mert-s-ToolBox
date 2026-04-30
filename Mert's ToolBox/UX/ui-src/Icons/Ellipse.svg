@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" fill-rule="evenodd" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="gridToolGrad" x1="30%" x2="75%" y1="30%" y2="75%" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6b6b6b" stop-opacity="1" />
+      <stop offset="1" stop-color="#cbcbcb" stop-opacity="1" />
+    </linearGradient>
+  </defs>
+  <path 
+    d="M27.1,8.4c2.8-2.7,7.2-2.7,9.9,0L55.5,27c2.8,2.7,2.8,7.2,0,10.1L36.9,55.6c-2.8,2.7-7.2,2.7-9.9,0L8.6,37c-2.8-2.7-2.8-7.2,0-10.1L27.1,8.4z M37.4,21.7c-3-2.9-7.8-2.9-10.7,0l-5,4.9c-3,2.9-3,7.7,0,10.8l5,4.9c3,2.9,7.8,2.9,10.7,0l5-4.9c3-2.9,3-7.7,0-10.8L37.4,21.7z" 
+    fill="url(#gridToolGrad)" 
+    stroke="#707070" 
+    stroke-width="3.06" 
+    clip-rule="evenodd" 
+  />
+</svg>
