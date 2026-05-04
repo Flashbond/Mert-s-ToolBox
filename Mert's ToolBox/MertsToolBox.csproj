@@ -40,7 +40,7 @@
 	
 	<ItemGroup>
 		<Reference Include="0Harmony">
-			<HintPath>..\..\AppData\LocalLow\Colossal Order\Cities Skylines II\Mods\Mert's Perfect Circle\0Harmony.dll</HintPath>
+			<HintPath>Management\Patches\0Harmony.dll</HintPath>
 		</Reference>
 		<Reference Include="Colossal.Collections">
 		  <HintPath>D:\Cities Skylines II\Cities2_Data\Managed\Colossal.Collections.dll</HintPath>

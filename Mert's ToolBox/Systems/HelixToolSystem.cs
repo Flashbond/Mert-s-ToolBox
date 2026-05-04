@@ -33,7 +33,7 @@ namespace MertsToolBox.Systems
         /// Gets the name of the tool.
         /// </summary>
         public override string ToolId => "Helix";
-        public override string ToolName => "Procedual Helix";
+        public override string ToolName => "Procedural Helix";
 
         /// <summary>
         /// Indicates whether this tool allows overlapping placements.

@@ -3,23 +3,28 @@
     flex-direction: row;
     align-items: center;
     width: 100%;
-    gap: 12rem;
 }
 
 .trackWrapper {
-    flex: 1 1 auto;
-    min-width: 0;
+    flex: 0 0 80%;
+    padding: 0 12rem;
+    width: 80%;
     display: flex;
     align-items: center;
+    padding-top: 16rem;
+    padding-bottom: 16rem;
+    margin-top: -16rem;
+    margin-bottom: -16rem;
+    background-color: unquote("rgba(0, 0, 0, 0)");
+    cursor: pointer;
 }
-
 .track {
     width: 100%;
-    height: 6rem;
-    background-color: rgba(255, 255, 255, 0.15);
+    height: 8rem;
+    background-color: unquote("rgba(255, 255, 255, 0.15)");
     border-radius: 3rem;
     position: relative;
-    box-shadow: inset 0 1rem 2rem rgba(0,0,0,0.3);
+    box-shadow: inset 0 1rem 2rem unquote("rgba(0,0,0,0.3)");
 }
 
 .fill {
@@ -35,35 +40,38 @@
 .thumb {
     position: absolute;
     top: 50%;
-    width: 14rem;
-    height: 14rem;
+    width: 16rem;
+    height: 16rem;
     background-color: #ffffff;
     border-radius: 50%;
     transform: translate(-50%, -50%);
-    box-shadow: 0 2rem 4rem rgba(0, 0, 0, 0.5);
+    box-shadow: 0 2rem 4rem unquote("rgba(0, 0, 0, 0.5)");
     pointer-events: none;
 }
 
 .trackWrapper:hover .thumb {
     transform: translate(-50%, -50%) scale(1.2);
-    box-shadow: 0 0 8rem rgba(30, 131, 170, 0.8);
+    box-shadow: 0 0 8rem unquote("rgba(30, 131, 170, 0.8)");
 }
 
 .trackWrapper.dragging .thumb {
     transform: translate(-50%, -50%) scale(1.3);
     background-color: #e0f7ff;
-    box-shadow: 0 0 12rem rgba(30, 131, 170, 1);
+    box-shadow: 0 0 12rem unquote("rgba(30, 131, 170, 1)");
 }
 
 .valueDisplay {
-    flex: 0 0 auto;
-    min-width: 52rem;
-    padding: 3rem 8rem;
-    border-radius: 6rem;
-    background-color: rgba(255, 255, 255, 0.08);
-    color: rgba(238, 238, 238, 1);
-    font-size: 1.1em;
+    flex: 1;
+    min-width: 0;
+    padding: 3rem 4rem;
+    border-radius: 3rem;
+    border: 1rem solid unquote("rgba(255, 255, 255, 0.2)");
+    background-color: unquote("rgba(0, 0, 0, 0.15)");
+    color: unquote("rgba(238, 238, 238, 1)");
+    font-size: 1em;
     line-height: 1.2;
     text-align: center;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: clip;
 }

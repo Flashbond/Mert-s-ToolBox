@@ -167,6 +167,27 @@ export const GridPanelSection = () => {
                 />
             </VanillaResolver.instance.Section>
 
+            {/* ONE-WAY PATTERN ROW */}
+            <VanillaResolver.instance.Section title="Pattern">
+                <VanillaResolver.instance.ToolButton
+                    src={alternatingIcon}
+                    selected={isAlternating}
+                    disabled={!isOneWaySupported}
+                    tooltip={isOneWaySupported ? "Alternating" : "REQUIRES ONE-WAY ROAD"}
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    onSelect={() => trigger("MertsToolBox", "GridToggleAlternating")}
+                />
+
+                <VanillaResolver.instance.ToolButton
+                    src={orientationIcon}
+                    selected={isOrientationLeftBottom}
+                    disabled={!isOneWaySupported}
+                    tooltip={isOneWaySupported ? "Orientation" : "REQUIRES ONE-WAY ROAD"}
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    onSelect={() => trigger("MertsToolBox", "GridToggleOrientation")}
+                />
+            </VanillaResolver.instance.Section>
+
             {/* ELEVATION ROW */}
             <VanillaResolver.instance.Section title="Elevation">
                 <VanillaResolver.instance.ToolButton
@@ -193,27 +214,6 @@ export const GridPanelSection = () => {
                     onSelect={(val) => {
                         trigger("MertsToolBox", "ElevationStep", val);
                     }}
-                />
-            </VanillaResolver.instance.Section>
-
-            {/* ONE-WAY PATTERN ROW */}
-            <VanillaResolver.instance.Section title="Pattern">
-                <VanillaResolver.instance.ToolButton
-                    src={alternatingIcon}
-                    selected={isAlternating}
-                    disabled={!isOneWaySupported}
-                    tooltip={isOneWaySupported ? "Alternating" : "REQUIRES ONE-WAY ROAD"}
-                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
-                    onSelect={() => trigger("MertsToolBox", "GridToggleAlternating")}
-                />
-
-                <VanillaResolver.instance.ToolButton
-                    src={orientationIcon}
-                    selected={isOrientationLeftBottom}
-                    disabled={!isOneWaySupported}
-                    tooltip={isOneWaySupported ? "Orientation" : "REQUIRES ONE-WAY ROAD"}
-                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
-                    onSelect={() => trigger("MertsToolBox", "GridToggleOrientation")}
                 />
             </VanillaResolver.instance.Section>
 

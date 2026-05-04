@@ -16,7 +16,7 @@ namespace MertsToolBox.Systems
         public readonly int[] m_LengthSteps = new int[] { 8, 6, 4, 2 };
         private int m_CurrentLengthStepIndex = 0;
 
-        private float m_N = 2.0f;
+        private float m_N = 2.171f;
 
         private int m_PendingWidthChange = 0;
         private int m_TargetWidthStep = -1;
@@ -98,7 +98,12 @@ namespace MertsToolBox.Systems
         /// <summary>
         /// Calculates and retrieves the current N slider value mapped to a 1-15 scale.
         /// </summary>
-        public float GetCurrentNSliderValue() => 1.0f + (((1.0f - (0.895f / m_N)) - 0.105f) / 0.895f) * 14.0f;
+        // UI Değerini (1-15) Mevcut m_N Üzerinden Hesapla
+        public float GetCurrentNSliderValue()
+        {
+            float currentKappa = 1.0f - (0.895f / m_N);
+            return 1.0f + ((currentKappa - 0.265f) / 0.6455f) * 14.0f;
+        }
         #endregion
 
         #region Core Tool Processing
@@ -210,7 +215,9 @@ namespace MertsToolBox.Systems
             float nextSlider = math.clamp(math.abs(targetSlider - 8.0f) < 0.05f ? 8.0f : targetSlider, 1.0f, 15.0f);
             if (math.abs(GetCurrentNSliderValue() - nextSlider) < 0.01f) return;
 
-            m_N = 0.895f / (1.0f - math.min(0.105f + ((nextSlider - 1.0f) / 14.0f) * 0.895f, 0.999f));
+            float targetKappa = 0.265f + ((nextSlider - 1.0f) / 14.0f) * 0.6455f;
+            m_N = 0.895f / (1.0f - math.min(targetKappa, 0.999f));
+
             QueuePreviewRebuild();
         }
         #endregion
@@ -247,8 +254,8 @@ namespace MertsToolBox.Systems
         private ObjectSubNetInfo[] BuildSuperEllipseSubNets(NetPrefab roadPrefab, float a, float b, float n, float elevation)
         {
             ObjectSubNetInfo[] result = new ObjectSubNetInfo[4];
-            float kappa = 1.0f - (0.895f / n);
-
+            float kappa = (1.0f - (0.895f / n));
+           
             float3[] p = { new(a, elevation, 0), new(0, elevation, b), new(-a, elevation, 0), new(0, elevation, -b) };
 
             for (int i = 0; i < 4; i++)

@@ -22,13 +22,13 @@ namespace MertsToolBox.Settings
 
                 // Tabs
                 { m_Settings.GetOptionTabLocaleID(ToolBoxSettings.TAB_CIRCLE), "Perfect Circle" },
-                { m_Settings.GetOptionTabLocaleID(ToolBoxSettings.TAB_HELIX), "Procedual Helix" },
+                { m_Settings.GetOptionTabLocaleID(ToolBoxSettings.TAB_HELIX), "Procedural Helix" },
                 { m_Settings.GetOptionTabLocaleID(ToolBoxSettings.TAB_SUPERELLIPSE), "SuperEllipse" },
                 { m_Settings.GetOptionTabLocaleID(ToolBoxSettings.TAB_GRID), "Smart Grid" },
 
                 // Fallback tab keys
                 { "Settings.TAB[Circle]", "Perfect Circle" },
-                { "Settings.TAB[Helix]", "Procedual Helix" },
+                { "Settings.TAB[Helix]", "Procedural Helix" },
                 { "Settings.TAB[Super Ellipse]", "SuperEllipse" },
                 { "Settings.TAB[Grid]", "Smart Grid" },
 

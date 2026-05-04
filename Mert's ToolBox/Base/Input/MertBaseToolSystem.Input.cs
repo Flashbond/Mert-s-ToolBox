@@ -29,6 +29,9 @@ namespace MertsToolBox
         private bool m_VanillaElevationSuppressed;
         protected static readonly Dictionary<Entity, MertRoadProfile> s_RoadProfileCache = new();
 
+        private static FieldInfo s_BindingField;
+        private static PropertyInfo s_ValueProperty;
+
         protected virtual bool HandlesOwnElevationInput => true;
 
         private static readonly float[] s_ElevationStepValues = new float[]
@@ -616,34 +619,30 @@ namespace MertsToolBox
         {
             selectedAssetEntity = Entity.Null;
 
-            try
-            {
-                var toolbarSystem = World.DefaultGameObjectInjectionWorld?
-                    .GetExistingSystemManaged<Game.UI.InGame.ToolbarUISystem>();
+            var toolbarSystem = World.DefaultGameObjectInjectionWorld?
+                .GetExistingSystemManaged<Game.UI.InGame.ToolbarUISystem>();
 
-                if (toolbarSystem == null)
-                    return false;
+            if (toolbarSystem == null) return false;
 
-                var bindingField = typeof(Game.UI.InGame.ToolbarUISystem)
+            if (s_BindingField == null)
+                s_BindingField = typeof(Game.UI.InGame.ToolbarUISystem)
                     .GetField("m_SelectedAssetBinding", BindingFlags.Instance | BindingFlags.NonPublic);
 
-                if (bindingField?.GetValue(toolbarSystem) is not object bindingObj)
-                    return false;
-
-                var valueProperty = bindingObj.GetType().GetProperty("value");
-                if (valueProperty == null)
-                    return false;
-
-                // 👇 BURASI AYNI SCOPE İÇİNDE
-                selectedAssetEntity = (Entity)valueProperty.GetValue(bindingObj);
-
-                return selectedAssetEntity != Entity.Null;
-            }
-            catch
-            {
-                selectedAssetEntity = Entity.Null;
+            if (s_BindingField?.GetValue(toolbarSystem) is not object bindingObj)
                 return false;
+
+            if (s_ValueProperty == null)
+                s_ValueProperty = bindingObj.GetType().GetProperty("value");
+
+            if (s_ValueProperty == null) return false;
+
+            var rawValue = s_ValueProperty.GetValue(bindingObj);
+            if (rawValue is Entity entity)
+            {
+                selectedAssetEntity = entity;
             }
+
+            return selectedAssetEntity != Entity.Null;
         }
         #endregion
 

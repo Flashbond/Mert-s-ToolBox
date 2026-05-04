@@ -145,7 +145,6 @@ export const SuperEllipsePanelSection = () => {
 
             {/* N VALUE (CURVATURE) ROW */}
             <VanillaResolver.instance.Section title="N Value">
-                <div className={VanillaResolver.instance.mouseToolOptionsTheme.content}>
                     <MertSlider
                         min={1}
                         max={15}
@@ -156,7 +155,6 @@ export const SuperEllipsePanelSection = () => {
                         }}
                         formatValue={(v) => v.toFixed(1)}
                     />
-                </div>
             </VanillaResolver.instance.Section>
 
             {/* ELEVATION ROW */}

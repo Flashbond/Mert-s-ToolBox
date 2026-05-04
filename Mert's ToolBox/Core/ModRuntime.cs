@@ -1,21 +1,27 @@
 ﻿using System;
 using System.Linq;
 using System.Reflection;
-using UnityEngine;
+using Colossal.Logging;
 
 namespace MertsToolBox.Core
 {
     internal static class ModRuntime
     {
-        public const string LOG_PREFIX = "MERT_LOG: ";
+        public static ILog log = LogManager.GetLogger("MertsToolBox").SetShowsErrorsInUI(false);
 
         public static void Log(string message)
         {
-            Debug.Log(LOG_PREFIX + message);
+            log.Info(message);
         }
+
         public static void Warn(string message)
         {
-            Debug.LogWarning(LOG_PREFIX + message);
+            log.Warn(message);
+        }
+
+        public static void Error(string message)
+        {
+            log.Error(message);
         }
 
         public static FieldInfo GetFieldRecursive(Type type, string fieldName)

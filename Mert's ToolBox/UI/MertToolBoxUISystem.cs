@@ -25,6 +25,8 @@ namespace MertsToolBox
         private HelixToolSystem m_Helix;
         private SuperEllipseToolSystem m_SuperEllipse;
         private GridToolSystem m_Grid;
+
+        private static readonly float[] s_DefaultElevationSteps = new float[] { 10f, 5f, 2.5f, 1.25f };
         #endregion
 
         #region Nested Types
@@ -249,7 +251,7 @@ namespace MertsToolBox
             AddBinding(new ValueBinding<float[]>(
                 ModId,
                 "ElevationStepArray",
-                m_Circle?.GetElevationStepArray() ?? new float[] { 10f, 5f, 2.5f, 1.25f },
+                GetCurrentElevationSteps(),
                 new ArrayWriter<float>()
             ));
             AddUpdateBinding(new MertPolledBinding<float>(ModId, "ElevationValue", () =>
@@ -379,6 +381,14 @@ namespace MertsToolBox
         #endregion
 
         #region Tool Event Handling
+        private float[] GetCurrentElevationSteps()
+        {
+            if (m_Circle != null && m_Circle.ToolEnabled) return m_Circle.GetElevationStepArray();
+            if (m_SuperEllipse != null && m_SuperEllipse.ToolEnabled) return m_SuperEllipse.GetElevationStepArray();
+            if (m_Grid != null && m_Grid.ToolEnabled) return m_Grid.GetElevationStepArray();
+
+            return s_DefaultElevationSteps;
+        }
         /// <summary>
         /// Handles forceful tool abort requests originating from the UI system.
         /// </summary>
