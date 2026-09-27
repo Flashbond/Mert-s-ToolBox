@@ -1,5 +1,5 @@
 ﻿import { ModRegistrar } from "cs2/modding";
-import React, { useEffect, useLayoutEffect } from "react";
+import React, { useEffect, useLayoutEffect, useRef } from "react";
 import { trigger, bindValue, useValue } from "cs2/api";
 
 import { VanillaResolver } from "./utils/VanilliaResolver";
@@ -11,10 +11,10 @@ import { SoftBlockPanelSection } from "./SoftBlockPanelSection";
 import { GridPanelSection } from "./GridPanelSection";
 import { ToolBoxActionHints } from "./utils/ToolBoxActionHints";
 
-import shapeIcon from "./Icons/Circle.svg";
-import helixIcon from "./Icons/Helix.svg";
-import softBlockIcon from "./Icons/SoftBlock.svg";
-import gridIcon from "./Icons/SmartGrid.svg";
+import shapeIcon from "./icons/Circle.svg";
+import helixIcon from "./icons/Helix.svg";
+import softBlockIcon from "./icons/SoftBlock.svg";
+import gridIcon from "./icons/SmartGrid.svg";
 
 type ToolDef = {
     id: string;
@@ -36,7 +36,6 @@ const icons: Record<string, string> = {
 };
 
 let hasPreloadedIcons = false;
-let pendingOneShotCleanup = false;
 
 function buildToolDefs(toolListRaw: string): ToolDef[] {
     if (!toolListRaw) return [];
@@ -84,16 +83,39 @@ const ToolBoxModeRow = () => {
                         selected={isSelected}
                         tooltip={tool.tooltip}
                         focusKey={VanillaResolver.instance.FOCUS_DISABLED}
-                        onSelect={() => {
-                            pendingOneShotCleanup = true;
-                            trigger(ModId, "ToggleTool", tool.id);
-                        }}
+                        onSelect={() => {trigger(ModId, "ToggleTool", tool.id);}}
                     />
                 );
             })}
         </VanillaResolver.instance.Section>
     );
 };
+
+const KEEP_ROW_MATCHERS: ((row: HTMLElement) => boolean)[] = [
+    (row) => /anarchy/i.test(row.textContent ?? ""),
+    (row) => Array.from(row.querySelectorAll("img")).some(
+        (img) => /anarchy/i.test(img.getAttribute("src") ?? "")),
+];
+
+function findRowContainer(host: HTMLElement): HTMLElement | null {
+    let el: HTMLElement | null = host;
+    while (el && el.children.length === 1)
+        el = el.firstElementChild as HTMLElement | null;
+    return el;
+}
+
+function filterVanillaRows(host: HTMLElement) {
+    const container = findRowContainer(host);
+    if (!container) return;
+
+    Array.from(container.children).forEach((child) => {
+        const row = child as HTMLElement;
+        const keep = KEEP_ROW_MATCHERS.some((m) => m(row));
+        const display = keep ? "" : "none";
+        if (row.style.display !== display)
+            row.style.display = display;
+    });
+}
 
 const register: ModRegistrar = (moduleRegistry) => {
     VanillaResolver.setRegistry(moduleRegistry);
@@ -103,33 +125,31 @@ const register: ModRegistrar = (moduleRegistry) => {
     moduleRegistry.extend(mouseToolPath, "MouseToolOptions", (OriginalMouseToolOptions: any) => {
         return (props: any) => {
             const isAllowed = useValue(isToolBoxAllowed$) as boolean;
-            const activeToolJson = useValue(activeToolMode$) as string;
-            const activeTool = parseActiveTool(activeToolJson);
+            const activeTool = parseActiveTool(useValue(activeToolMode$) as string);
             const isActive = isAllowed && activeTool.id !== "None";
+            const hostRef = useRef<HTMLDivElement>(null);
 
+            useEffect(() => { preloadAllToolIcons(); }, []);
+
+            // Vanilla/diğer mod satırlarını gizle, sadece izin verilenleri bırak.
             useLayoutEffect(() => {
-                if (!isActive) return;
+                const host = hostRef.current;
+                if (!isActive || !host) return;
 
-           
-                    const root = document.querySelector(".merts-toolbox-root") as HTMLElement | null;
-                    if (!root) return;
+                filterVanillaRows(host);
 
-                    Array.from(root.children).forEach((child) => {
-                        const el = child as HTMLElement;
+                // İçerideki bileşenler yeniden çizildikçe (yeni satır eklenince) filtreyi tekrar uygula.
+                if (typeof MutationObserver !== "undefined") {
+                    const observer = new MutationObserver(() => filterVanillaRows(host));
+                    observer.observe(host, { childList: true, subtree: true });
+                    return () => observer.disconnect();
+                }
 
-                        const isToolPanel =
-                            el.classList.contains("shape-panel-container") ||
-                            el.classList.contains("helix-panel-container") ||
-                            el.classList.contains("softblock-panel-container") ||
-                            el.classList.contains("grid-panel-container");
-
-                        if (isToolPanel) return;
-                    });
+                let frame = 0;
+                const tick = () => { filterVanillaRows(host); frame = requestAnimationFrame(tick); };
+                frame = requestAnimationFrame(tick);
+                return () => cancelAnimationFrame(frame);
             }, [isActive, activeTool.id]);
-
-            useEffect(() => {
-                preloadAllToolIcons();
-            }, []);
 
             if (!isActive) {
                 return (
@@ -141,22 +161,22 @@ const register: ModRegistrar = (moduleRegistry) => {
             }
 
             return (
-                <div
-                    className="merts-toolbox-root"
-                    style={{
-                        width: "100%",
-                        display: "flex",
-                        flexDirection: "column",
-                        pointerEvents: "auto"
-                    }}
-                >
-                    <ToolBoxActionHints />
+                <>
+                    <div ref={hostRef} className="merts-vanilla-host">
+                        <OriginalMouseToolOptions {...props} />
+                    </div>
 
-                    <ShapePanelSection />
-                    <HelixPanelSection />
-                    <SoftBlockPanelSection />
-                    <GridPanelSection />
-                </div>
+                    <div
+                        className="merts-toolbox-root"
+                        style={{ width: "100%", display: "flex", flexDirection: "column", pointerEvents: "auto" }}
+                    >
+                        <ToolBoxActionHints />
+                        <ShapePanelSection />
+                        <HelixPanelSection />
+                        <SoftBlockPanelSection />
+                        <GridPanelSection />
+                    </div>
+                </>
             );
         };
     });

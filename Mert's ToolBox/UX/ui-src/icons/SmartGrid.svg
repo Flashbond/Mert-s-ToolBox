@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="gridToolRectGrad" x1="30%" x2="70%" y1="30%" y2="70%" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6b6b6b" stop-opacity="1" />
+      <stop offset="1" stop-color="#cbcbcb" stop-opacity="1" />
+    </linearGradient>
+  </defs>
+<path class="st0" d="M25.8,3.6H6.2c-1.6,0-2.9,1.3-2.9,2.9v19c0,1.6,1.3,2.9,2.9,2.9h19.5c1.6,0,2.9-1.3,2.9-2.9v-19
+	C28.6,4.9,27.3,3.6,25.8,3.6z M24.3,9.5v5.2h-6.2V8.1h5C23.8,8.1,24.3,8.7,24.3,9.5z M8.9,8.1h5.7v6.6H7.7V9.4
+	C7.7,8.7,8.3,8.1,8.9,8.1z M7.7,22.7v-4.5h6.9v5.8H9C8.3,23.8,7.7,23.3,7.7,22.7z M23.1,23.8h-4.8v-5.7h6v4.5
+	C24.3,23.3,23.8,23.8,23.1,23.8z"
+    fill="url(#gridToolRectGrad)"
+    stroke="#707070"
+    stroke-width="1.5"
+    stroke-miterlimit="10"/>
+</svg>

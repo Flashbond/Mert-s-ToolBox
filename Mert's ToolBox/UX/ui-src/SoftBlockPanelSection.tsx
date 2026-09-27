@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { trigger, call, bindValue, useValue } from "cs2/api";
-import StraightIcon from "./Icons/StraightCorner.svg";
-import crossWalkIcon from "./Icons/CrossWalk.svg";
+import StraightIcon from "./icons/StraightCorner.svg";
+import directionIcon from "./icons/Direction.svg";
+import crossWalkIcon from "./icons/CrossWalk.svg";
+import flattenIcon from "./icons/Flatten.svg";
 import { MertSlider } from "./utils/MertSlider";
 import { formatMeters } from "./utils/Formatters";
 import { VanillaResolver } from "./utils/VanilliaResolver";
@@ -24,7 +26,8 @@ const borderRadius$ = bindValue<number>("MertsToolBox", "GetBorderRadius");
 
 const softBlockStraightCorners$ = bindValue<boolean>("MertsToolBox", "SoftBlockStraightCorners", false);
 const softBlockStraightCornersSupported$ = bindValue<boolean>("MertsToolBox", "SoftBlockStraightCornersSupported", true);
-
+const softBlockIsClockwise$ = bindValue<boolean>("MertsToolBox", "MainDirectionState", false);
+const softBlockIsOneWaySupported$ = bindValue<boolean>("MertsToolBox", "SoftBlockIsOneWaySupported", false);
 const suppressCrosswalks$ = bindValue<boolean>("MertsToolBox", "SuppressCrosswalks", false);
 
 const elevationValue$ = bindValue<number>("MertsToolBox", "ElevationValue");
@@ -32,6 +35,7 @@ const elevationStepValue$ = bindValue<number>("MertsToolBox", "ElevationStepValu
 const elevationStepArray$ = bindValue<number[]>("MertsToolBox", "ElevationStepArray");
 
 const isSnapGeometryActive$ = bindValue<boolean>("MertsToolBox", "IsSnapGeometryActive");
+const isFlattenActive$ = bindValue<boolean>("MertsToolBox", "IsFlattenActive");
 
 const presetList$ = bindValue<string>("MertsToolBox", "PresetList", "");
 
@@ -78,7 +82,8 @@ export const SoftBlockPanelSection = () => {
 
     const straightCorners = useValue(softBlockStraightCorners$) as boolean;
     const straightCornersSupported = useValue(softBlockStraightCornersSupported$) as boolean;
-
+    const isClockwise = useValue(softBlockIsClockwise$) as boolean;
+    const isOneWaySupported = useValue(softBlockIsOneWaySupported$) as boolean;
     const suppressCrosswalks = useValue(suppressCrosswalks$) as boolean;
 
     const elevationValue = useValue(elevationValue$) as number;
@@ -86,6 +91,7 @@ export const SoftBlockPanelSection = () => {
     const elevationStepValues = useValue(elevationStepArray$) as number[];
 
     const isSnapGeometryActive = useValue(isSnapGeometryActive$) as boolean;
+    const isFlattenActive = useValue(isFlattenActive$) as boolean;
 
     const presetListRaw = useValue(presetList$) as string;
 
@@ -210,6 +216,21 @@ export const SoftBlockPanelSection = () => {
                 />
             </VanillaResolver.instance.Section>
 
+            <VanillaResolver.instance.Section title="Traffic Direction">
+                <VanillaResolver.instance.ToolButton
+                    src={directionIcon}
+                    selected={!isClockwise}
+                    disabled={!isOneWaySupported}
+                    tooltip={
+                        !isOneWaySupported
+                            ? "REQUIRES ONE-WAY ROAD"
+                            : (!isClockwise ? "Counter-Clockwise Direction" : "Clockwise Direction")
+                    }
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    onSelect={() => trigger("MertsToolBox", "ToggleMainDirection")}
+                />
+            </VanillaResolver.instance.Section>
+
             <VanillaResolver.instance.Section title="Remove Crosswalks">
                 <VanillaResolver.instance.ToolButton
                     src={crossWalkIcon}
@@ -255,6 +276,17 @@ export const SoftBlockPanelSection = () => {
                     focusKey={VanillaResolver.instance.FOCUS_DISABLED}
                     onSelect={() => trigger("MertsToolBox", "ToggleSnap")}
                     tooltip={`Snap to existing geometry`}
+                />
+            </VanillaResolver.instance.Section>
+
+            {/* FLATTEN ROW */}
+            <VanillaResolver.instance.Section title="Flatten">
+                <VanillaResolver.instance.ToolButton
+                    src={flattenIcon}
+                    selected={isFlattenActive}
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    onSelect={() => trigger("MertsToolBox", "ToggleFlattenGeometry")}
+                    tooltip={isFlattenActive ? "Shape stays flat; ignores terrain" : "Shape follows terrain"}
                 />
             </VanillaResolver.instance.Section>
 

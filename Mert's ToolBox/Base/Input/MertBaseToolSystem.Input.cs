@@ -246,7 +246,7 @@ namespace MertsToolBox
             if (applyAction != null && applyAction.WasPerformedThisFrame())
             {
                 if (m_ToolRaycastSystem != null &&
-                    m_ToolRaycastSystem.GetRaycastResult(out var result))
+                    m_ToolRaycastSystem.GetRaycastResult(out _))
                 {
                     RequestDisable(ToolExitMode.RestoreFromPlacement);
                 }
@@ -350,12 +350,7 @@ namespace MertsToolBox
                 bool isRoad = netPrefab is RoadPrefab;
                 bool isTrack = netPrefab is TrackPrefab;
 
-                bool isTransitRoad =
-                    internalName.Contains("transport") ||
-                    internalName.Contains("bus");
-
-                bool isPier =
-                    internalName.Contains("pier");
+                bool isPier = internalName.Contains("pier");
 
                 if (isPier)
                 {

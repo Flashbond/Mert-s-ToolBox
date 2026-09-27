@@ -1,7 +1,8 @@
 ﻿import React, { useEffect, useState } from "react";
 import { trigger, call, bindValue, useValue } from "cs2/api";
-import ccwIcon from "./Icons/CounterCW.svg";
-import crossWalkIcon from "./Icons/CrossWalk.svg";
+import directionIcon from "./icons/Direction.svg";
+import ccwIcon from "./icons/CounterCW.svg";
+import crossWalkIcon from "./icons/CrossWalk.svg";
 import { formatMeters, formatSmart } from "./utils/Formatters";
 import { VanillaResolver } from "./utils/VanilliaResolver";
 import { parseActiveTool, ActiveTool } from "./utils/ActiveTool";
@@ -23,7 +24,9 @@ const helixClearance$ = bindValue<number>("MertsToolBox", "HelixClearance");
 const helixClearanceStepValue$ = bindValue<number>("MertsToolBox", "HelixClearanceStepValue");
 const helixClearanceStepArray$ = bindValue<number[]>("MertsToolBox", "HelixClearanceStepArray");
 
-const helixIsClockwise$ = bindValue<boolean>("MertsToolBox", "HelixIsClockwise");
+const helixIsAscending$ = bindValue<boolean>("MertsToolBox", "MainDirectionState", false);
+const helixIsOneWaySupported$ = bindValue<boolean>("MertsToolBox", "HelixIsOneWaySupported", false);
+const helixIsClockwise$ = bindValue<boolean>("MertsToolBox", "HelixIsClockwise", false);
 
 const suppressCrosswalks$ = bindValue<boolean>("MertsToolBox", "SuppressCrosswalks", false);
 
@@ -75,7 +78,8 @@ export const HelixPanelSection = () => {
     const clearance = useValue(helixClearance$) as number;
     const clearanceStepValue = useValue(helixClearanceStepValue$) as number;
     const clearanceStepValues = useValue(helixClearanceStepArray$) as number[];
-
+    const isOneWaySupported = useValue(helixIsOneWaySupported$) as boolean;
+    const isAscending = useValue(helixIsAscending$) as boolean;
     const isClockwise = useValue(helixIsClockwise$) as boolean;
 
     const suppressCrosswalks = useValue(suppressCrosswalks$) as boolean;
@@ -112,13 +116,21 @@ export const HelixPanelSection = () => {
             className={`helix-panel-container`}
             onMouseDown={(e) => { e.stopPropagation(); }}
             onContextMenu={(e) => { e.stopPropagation(); }}
-            style={{ display: "flex", flexDirection: "column" }}
-        >
+            style={{ display: "flex", flexDirection: "column" }}>
             <div className={'panel-header'} style={{
                 fontSize: "1.1em",
                 fontWeight: 600,
-                padding: "2rem 10rem"
-            }}>{activeTool.name}</div>
+                padding: "2rem 2rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "8rem",
+                whiteSpace: "nowrap"
+            }}>
+                {activeTool.name}
+                <span style={{ color: "yellow", fontSize: "1em" }}>
+                    (REQUIRES ANARCHY)
+                </span>
+            </div>
 
             {/* DIAMETER ROW */}
             <VanillaResolver.instance.Section title="Diameter">
@@ -199,7 +211,22 @@ export const HelixPanelSection = () => {
                 />
             </VanillaResolver.instance.Section>
 
-            <VanillaResolver.instance.Section title="Direction">
+            <VanillaResolver.instance.Section title="Climbing Direction">
+                <VanillaResolver.instance.ToolButton
+                    src={directionIcon}
+                    selected={!isAscending}
+                    disabled={!isOneWaySupported}
+                    tooltip={
+                        !isOneWaySupported
+                            ? "REQUIRES ONE-WAY ROAD"
+                            : (!isAscending ? "Downhill" : "Uphill")
+                    }
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    onSelect={() => trigger("MertsToolBox", "ToggleMainDirection")}
+                />
+            </VanillaResolver.instance.Section>
+
+            <VanillaResolver.instance.Section title="Helix Direction">
                 <VanillaResolver.instance.ToolButton
                     src={ccwIcon}
                     selected={!isClockwise}

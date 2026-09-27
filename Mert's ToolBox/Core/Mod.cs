@@ -2,6 +2,7 @@
 using Game;
 using Game.Modding;
 using Game.SceneFlow;
+using Game.Tools;
 using HarmonyLib;
 using MertsToolBox.Settings;
 using MertsToolBox.Systems;
@@ -34,13 +35,16 @@ namespace MertsToolBox.Core
 
             m_Harmony = new Harmony("com.mertstoolbox");
             m_Harmony.PatchAll();
-
+ 
             updateSystem.UpdateAt<ShapeToolSystem>(SystemUpdatePhase.ToolUpdate);
             updateSystem.UpdateAt<HelixToolSystem>(SystemUpdatePhase.ToolUpdate);
-            updateSystem.UpdateAt<InjectDummyParentToPillarsSystem>(SystemUpdatePhase.Modification3);
+   
             updateSystem.UpdateAt<SoftBlockToolSystem>(SystemUpdatePhase.ToolUpdate);
             updateSystem.UpdateAt<GridToolSystem>(SystemUpdatePhase.ToolUpdate);
             updateSystem.UpdateAt<MertToolBoxUISystem>(SystemUpdatePhase.UIUpdate);
+
+            updateSystem.UpdateAt<InjectDummyParentToPillarsSystem>(SystemUpdatePhase.Modification3);
+            updateSystem.UpdateAfter<MertToolBoxTerrainFlattenSystem, ObjectToolSystem>(SystemUpdatePhase.ToolUpdate);
 
             ModRuntime.Log("ToolBox loaded.");
         }

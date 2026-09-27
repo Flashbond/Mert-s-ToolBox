@@ -25,7 +25,6 @@ namespace MertsToolBox.Management
         public static bool ControlledSelectAssetReplay { get; set; }
         public static bool ControlledSelectCategoryReplay { get; set; }
         public static bool ControlledClearSelectionReplay { get; set; }
-        public static bool SuppressToolChangedDuringColdstart { get; set; }
         public static bool SuppressToolbarCaptureDuringColdstart { get; set; }
         public static bool HasReleasedStaleObjectToolThisFrame { get; set; }
 
@@ -33,10 +32,21 @@ namespace MertsToolBox.Management
         public static bool HelixCleanupRequested { get; set; } = false;
         public static bool ActiveHelixUsesPierLikePrefab;
         public static bool SuppressCrosswalks { get; set; }
+        public static float ActiveHelixBaseElevation = 0f;
+        public static float ActiveHelixClearance =0f;
         #endregion
+        #region Flatten States
+        /// <summary>The flatten-capable tool that currently owns the session (null when none).</summary>
+        public static MertBaseToolSystem FlattenOwner { get; set; }
 
+        /// <summary>True while the flatten system still has work in flight (bake, overlay, preview or splat refresh).</summary>
+        public static bool FlattenBusy { get; set; }
+
+        public static bool FlattenToolActive => FlattenOwner != null;
+        #endregion
         #region Sanp States
         public static bool SnapGeometryEnabled = true;
+        public static bool FlattenGeometryEnabled = false;
 
         public static Snap BuildGlobalSnapMask()
         {

@@ -3,7 +3,8 @@ using Game.Tools;
 using MertsToolBox.Management;
 using Unity.Entities;
 
-namespace MertsToolBox.Systems { 
+namespace MertsToolBox.Systems
+{
     public partial class InjectDummyParentToPillarsSystem : SystemBase
     {
         protected override void OnCreate()
@@ -17,7 +18,7 @@ namespace MertsToolBox.Systems {
         protected override void OnUpdate()
         {
             if (!MertToolState.HelixCleanupRequested) return;
-            Entity dummyParent = new() { Index = 999999, Version = 1 };
+            Entity dummyParent = new() { Index = 16384 * 8192 - 1, Version = 1 };
 
             Entities
                 .WithAll<Temp, Pillar>()

@@ -38,8 +38,8 @@
 	  <UpToDateCheckInput Remove="ui-dist\**" />
 	</ItemGroup>
 	<ItemGroup>
-	  <Compile Remove="Base\ZoneBrowserProvider.cs" />
-	  <Compile Remove="Systems\HelixFakeGroundSystem.cs" />
+	  <Compile Remove="Systems\HelixErrorColorOverrideSystem.cs" />
+	  <Compile Remove="Systems\HelixToolErrorOverrideSystem.cs" />
 	</ItemGroup>
 
 	<ItemGroup>

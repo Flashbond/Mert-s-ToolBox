@@ -34,7 +34,7 @@
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/merts-perfect-circle-feedback-suggestions-bug-reports.1911521/" />
 
 	<!--Version of the mod-->
-	<ModVersion Value="1.0.3" />
+	<ModVersion Value="1.0.4" />
 
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.6.*" />
@@ -47,7 +47,7 @@
 
 	<!--Change log for new version-->
 	<ChangeLog>
-		* "The given key 'Any' was not present in the dictionary" error fix.
+		* "The given key 'Any' was not present in the dictionary." error fix.
 	</ChangeLog>
 
 	<!--External links-->

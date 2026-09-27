@@ -1,10 +1,10 @@
 ﻿using Colossal.Entities;
-using Colossal.Mathematics;
 using Game.Prefabs;
 using Game.Tools;
 using MertsToolBox.Core;
 using MertsToolBox.Management;
 using System;
+using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
@@ -14,49 +14,12 @@ namespace MertsToolBox
     public abstract partial class MertBaseToolSystem
     {
 
-        #region Fields & Constants
-        private static bool s_RoadProfileDiscoveryCompleted;
-        private static NetPrefab s_CachedSmallRoad;
-        #endregion
-
-
-        #region Initialization & Prebaking
-        private void TryDiscoverRoadProfiles()
-        {
-            if (s_RoadProfileDiscoveryCompleted)
-                return;
-
-            EntityQuery query = EntityManager.CreateEntityQuery(
-                ComponentType.ReadOnly<PrefabData>(),
-                ComponentType.ReadOnly<NetData>());
-
-            using var entities = query.ToEntityArray(Unity.Collections.Allocator.Temp);
-
-            int discovered = 0;
-
-            foreach (Entity entity in entities)
-            {
-                if (!m_PrefabSystem.TryGetPrefab<PrefabBase>(
-                        entity,
-                        out var prefab))
-                {
-                    continue;
-                }
-
-                if (prefab is not NetPrefab netPrefab)
-                    continue;
-
-                IsStandardRoadPrefab(netPrefab);
-                discovered++;
-            }
-
-            if (discovered > 0)
-                s_RoadProfileDiscoveryCompleted = true;
-        }
-
+        #region Initialization
         /// <summary>
-        /// Creates a detached warmup stamp prefab that is never stored in the per-road registry.
-        /// This isolates ObjectTool foundation warmup from real gameplay stamps.
+        /// Creates the shared runtime stamp prefab used for handing generated geometry off to
+        /// ObjectTool. Lazily created the first time a real TryMutateTargetStamp /
+        /// PrimeAndShowPreviewOnEnable happens - i.e. the first genuine tool use - never during
+        /// game load.
         /// </summary>
         private AssetStampPrefab CreateSharedRuntimeStampPrefab()
         {
@@ -78,129 +41,6 @@ namespace MertsToolBox
             return stamp;
         }
 
-        /// <summary>
-        /// Attempts to perform a late prebake using a real road prefab once the game data is loaded.
-        /// Use vanilla "Small Road" as a stable warmup anchor.
-        /// It is not treated as proof that all roads are fully loaded yet;
-        /// only as a reliable signal that the vanilla road prefab set has started to appear.
-        /// </summary>
-        private void TryLatePrebakeWithRealRoad()
-        {
-            if (s_ObjectToolFoundationWarmed)
-                return;
-
-            if (!s_RoadProfileDiscoveryCompleted)
-                TryDiscoverRoadProfiles();
-
-            NetPrefab smallRoad = GetCachedSmallRoad();
-
-            if (smallRoad == null)
-                return;
-
-            if (!EnsureSharedRuntimeStamp())
-                return;
-
-            PrepareSharedStampForRoad(smallRoad);
-            TryWarmObjectToolPreviewFoundationOnce();
-        }
-
-        private void PrepareSharedStampForRoad(NetPrefab roadPrefab)
-        {
-            if (!s_SharedRuntimeStamp.TryGet<ObjectSubNets>(
-                out var subNets) ||
-                subNets == null)
-            {
-                subNets = s_SharedRuntimeStamp.AddComponent<ObjectSubNets>();
-            }
-
-            subNets.m_SubNets = new[]
-            {
-                new ObjectSubNetInfo
-                {
-                    m_NetPrefab = roadPrefab,
-                    m_BezierCurve = new Bezier4x3(
-                        new float3(0f,0f,0f),
-                        new float3(2f,0f,0f),
-                        new float3(4f,0f,0f),
-                        new float3(6f,0f,0f)
-                    ),
-                    m_NodeIndex = new int2(0,1),
-                    m_ParentMesh = new int2(-1,-1)
-                }
-            };
-
-            s_SharedRuntimeStamp.asset?.MarkDirty();
-
-            Entity entity = m_PrefabSystem.GetEntity(s_SharedRuntimeStamp);
-
-            if (entity != Entity.Null &&EntityManager.Exists(entity))
-                m_PrefabSystem.UpdatePrefab(s_SharedRuntimeStamp, entity);
-        }
-
-        private void TryWarmObjectToolPreviewFoundationOnce()
-        {          
-            if (s_ObjectToolFoundationWarmed)
-                return;
-
-            if (m_ObjectToolSystem == null || m_ToolSystem == null)
-                return;
-
-            if (s_SharedRuntimeStamp == null)
-                return;
-
-            try
-            {
-                MertToolState.SuppressToolChangedDuringColdstart = true;
-                MertToolState.SuppressToolbarCaptureDuringColdstart = true;
-
-                if (m_ToolSystem.activeTool != m_ObjectToolSystem)
-                {
-                    m_ToolSystem.selected = Entity.Null;
-                    m_ToolSystem.activeTool = m_ObjectToolSystem;
-                }
-
-                if (!m_ObjectToolSystem.TrySetPrefab(s_SharedRuntimeStamp))
-                    return;
-
-                m_ObjectToolSystem.InitializeRaycast();
-                s_ObjectToolFoundationWarmed = true;
-            }
-            catch (Exception e)
-            {
-                ModRuntime.Warn($"'{e.Message}' exception has been thrown by an external mod. You may ignore the error.");
-            }
-            finally
-            {
-                MertToolState.SuppressToolbarCaptureDuringColdstart = false;
-                MertToolState.SuppressToolChangedDuringColdstart = false;
-            }
-        }
-
-        private NetPrefab GetCachedSmallRoad()
-        {
-            if (s_CachedSmallRoad != null)
-                return s_CachedSmallRoad;
-
-            EntityQuery query = EntityManager.CreateEntityQuery(
-                ComponentType.ReadOnly<NetData>(),
-                ComponentType.ReadOnly<PrefabData>());
-
-            using var entities = query.ToEntityArray(Unity.Collections.Allocator.Temp);
-
-            foreach (var entity in entities)
-            {
-                if (!m_PrefabSystem.TryGetPrefab<PrefabBase>(entity, out var prefab))
-                    continue;
-
-                if (prefab is NetPrefab net && string.Equals(net.name, "Small Road", StringComparison.OrdinalIgnoreCase))
-                {
-                    s_CachedSmallRoad = net;
-                    return net;
-                }
-            }
-
-            return null;
-        }
         /// <summary>
         /// Prepares the context and queues a preview rebuild when the tool is enabled.
         /// </summary>
@@ -251,11 +91,42 @@ namespace MertsToolBox
             try
             {
                 ApplyStampSnapMetadataToEntity(targetEntity);
+                ApplyFlattenModeToEntity(targetEntity);
             }
             catch (Exception e)
             {
                 ModRuntime.Warn($"PrepareRuntimeStampSnapMetadata error: {e.Message}");
             }
+        }
+
+        /// <summary>
+        /// Applies the "flatten" placement mode to the stamp entity. When
+        /// MertToolState.FlattenGeometryEnabled is on, forces GeometryFlags.HasBase onto the
+        /// entity's ObjectGeometryData - vanilla's Game.Objects.ObjectUtils.AdjustPosition then
+        /// places the whole object as a flat, untilted plane at the height of its locally
+        /// highest terrain corner, instead of averaging + tilting it to match local slope
+        /// (confirmed via decompiled AdjustPosition: without HasBase, it 4-corner-samples the
+        /// object's ObjectGeometryData.m_Bounds and builds a LookRotationSafe tilt from the
+        /// local gradient - the source of the "engebeli" look on grid/ring shapes). Off, the
+        /// flag is cleared and vanilla's default terrain-adaptive tilt returns.
+        /// </summary>
+        private void ApplyFlattenModeToEntity(Entity targetEntity)
+        {
+            if (targetEntity == Entity.Null || !EntityManager.Exists(targetEntity)) return;
+ 
+            if (!EntityManager.TryGetComponent(targetEntity, out ObjectGeometryData geometryData)) return;
+            
+            Game.Objects.GeometryFlags newFlags = MertToolState.FlattenGeometryEnabled
+                ? geometryData.m_Flags | Game.Objects.GeometryFlags.HasBase
+                : geometryData.m_Flags & ~Game.Objects.GeometryFlags.HasBase;
+
+            if (newFlags == geometryData.m_Flags)
+                return;
+
+            geometryData.m_Flags = newFlags;
+            EntityManager.SetComponentData(targetEntity, geometryData);
+
+            bool verifyOk = EntityManager.TryGetComponent(targetEntity, out ObjectGeometryData verify) && verify.m_Flags == newFlags;
         }
 
         /// <summary>
@@ -288,7 +159,7 @@ namespace MertsToolBox
                 if (isAnySnapActive)
                     placeable.m_Flags |= Game.Objects.PlacementFlags.SubNetSnap;
                 else
-                    placeable.m_Flags &= ~Game.Objects.PlacementFlags.SubNetSnap;           
+                    placeable.m_Flags &= ~Game.Objects.PlacementFlags.SubNetSnap;
             }
 
             if (oldFlags != placeable.m_Flags || changed)
@@ -408,6 +279,58 @@ namespace MertsToolBox
         }
 
         /// <summary>
+        /// Returns the distinct REAL net prefabs (actual selected roads) referenced by this
+        /// tool's current runtime stamp's Game.Prefabs.SubNet buffer - i.e. exactly the
+        /// prefab(s) whose NetGeometryData vanilla's ObjectToolBaseSystem.CreateDefinitionsJob.
+        /// CreateSubNet reads to decide whether to terrain-sample each segment
+        /// (NetUtils.AdjustPosition against m_TerrainHeightData - the source of the terrain-
+        /// conforming look) or, when GeometryFlags.FlattenTerrain is set on that prefab's
+        /// NetGeometryData, use our authored local curve heights as-is with no terrain lookup
+        /// at all. NOT the same entity as our own AssetStampPrefab wrapper - GeometryFlags.
+        /// FlattenTerrain lives on the real road prefab's NetGeometryData, one level down.
+        /// Used by MertToolBoxFlattenTerrainSpoofSystem to know which real prefab(s) to
+        /// temporarily flag for the current frame.
+        /// </summary>
+        internal bool TryGetActiveSubNetRoadPrefabs(NativeList<Entity> results)
+        {
+            if (m_RuntimeStamp == null) return false;
+            
+            if (!TryResolveRuntimeStampEntity(m_RuntimeStamp, out Entity stampEntity)) return false;
+            
+            if (!EntityManager.HasBuffer<Game.Prefabs.SubNet>(stampEntity)) return false;
+            
+            DynamicBuffer<Game.Prefabs.SubNet> subNets = EntityManager.GetBuffer<Game.Prefabs.SubNet>(stampEntity);
+            for (int i = 0; i < subNets.Length; i++)
+            {
+                Entity prefab = subNets[i].m_Prefab;
+                if (prefab != Entity.Null && !results.Contains(prefab))
+                    results.Add(prefab);
+            }
+
+            return results.Length > 0;
+        }
+
+        /// <summary>
+        /// Exposes the shared runtime stamp's own PREFAB entity (the one
+        /// m_PrefabSystem/ObjectToolSystem use to spawn placed instances via
+        /// PrefabRef.m_Prefab) - NOT a placed instance, NOT the real road sub-net prefabs
+        /// (see TryGetActiveSubNetRoadPrefabs for those). Lets non-tool-specific systems
+        /// (e.g. MertToolBoxTerrainFlattenSystem) recognize which placed Game.Objects.Transform
+        /// entities are actual committed instances of THIS tool's stamp, by comparing their
+        /// PrefabRef.m_Prefab against this value, without needing direct access to
+        /// m_RuntimeStamp/m_PrefabSystem.
+        /// </summary>
+        internal bool TryGetRuntimeStampPrefabEntity(out Entity prefabEntity)
+        {
+            prefabEntity = Entity.Null;
+
+            if (m_RuntimeStamp == null)
+                return false;
+
+            return TryResolveRuntimeStampEntity(m_RuntimeStamp, out prefabEntity);
+        }
+
+        /// <summary>
         /// Retrieves and updates the current entity representation of the given stamp prefab.
         /// </summary>
         private bool TryResolveRuntimeStampEntity(AssetStampPrefab stamp, out Entity entity)
@@ -444,7 +367,7 @@ namespace MertsToolBox
 
             ClearPendingHandoff();
             HandoffToObjectTool(stampToHandOff);
-           
+
             return true;
         }
 
@@ -462,7 +385,7 @@ namespace MertsToolBox
             }
 
             if (!TryResolveRuntimeStampEntity(m_PendingHandoffStamp, out refreshedEntity)) return false;
-  
+
             if (!IsRuntimeStampEntityReady(refreshedEntity))
                 return false;
 
@@ -479,6 +402,9 @@ namespace MertsToolBox
 
             try
             {
+                LastHandoffSupportsFlatten = SupportsFlatten;
+                LastHandoffElevation = GetCurrentNetToolElevation();
+
                 bool toolSwitchNeeded = m_ToolSystem.activeTool != m_ObjectToolSystem;
                 bool stampChanged = m_LastHandedOffStamp != stamp;
                 bool geometryChanged = m_LastHandedOffRevision != m_RuntimeStampRevision;
@@ -512,10 +438,50 @@ namespace MertsToolBox
 
                 if (OverridesObjectToolSnapMask)
                     ApplySnapMaskToActiveTool();
+
+                // FLICKER FIX: only needed on an actual tool switch. Proven from the decompiled
+                // ToolSystem.ToolUpdate(): the activeTool != m_LastTool check runs ONCE, at the
+                // top of that method, BEFORE the nested SystemUpdatePhase.ToolUpdate dispatch
+                // that our own OnUpdate() (and ObjectToolSystem's) live inside. We flip
+                // activeTool from INSIDE that same nested dispatch, so ObjectToolSystem.Enabled
+                // never gets set true this frame - the engine's own per-phase dispatch
+                // deterministically skips it until next frame. That gap was the flicker.
+                // On a stampChanged/geometryChanged-ONLY frame (no switch), ObjectToolSystem is
+                // already the active/enabled tool, so the natural dispatch calls it later this
+                // same frame regardless - forcing it here would fire Update() twice in one frame
+                // and desync ObjectToolSystem's internal raycast state-diffing, which is why
+                // this is guarded to only the switch frame.
+                if (toolSwitchNeeded)
+                    ForceCompleteObjectToolUpdate();
             }
             catch (Exception e)
             {
                 ModRuntime.Warn($"HandoffToObjectTool error: {e}");
+            }
+        }
+
+        /// <summary>
+        /// Compensates for the one-frame ToolUpdate dispatch gap explained above by invoking
+        /// the exact same PUBLIC API the engine itself uses when handing off the OUTGOING tool
+        /// inside ToolSystem.ToolUpdate() (`this.m_LastTool.Update()`) - NOT reflection into the
+        /// private OnUpdate(JobHandle) with a synthetic default(JobHandle). ComponentSystemBase
+        /// .Update() reads/writes `this.Dependency` correctly on its own, so unlike a
+        /// reflection-based version, this can't race against whatever job chain
+        /// PrefabSystem/ReplacePrefabSystem left in flight for the freshly-mutated stamp.
+        /// </summary>
+        private void ForceCompleteObjectToolUpdate()
+        {
+            try
+            {
+                if (m_ObjectToolSystem == null)
+                    return;
+
+                m_ObjectToolSystem.Enabled = true;
+                m_ObjectToolSystem.Update();
+            }
+            catch (Exception e)
+            {
+                ModRuntime.Warn("ForceCompleteObjectToolUpdate error: " + e.Message);
             }
         }
         #endregion

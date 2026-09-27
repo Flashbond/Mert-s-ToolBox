@@ -23,16 +23,13 @@ namespace MertsToolBox.Management.Patches
             if (!MertToolbarHandoffMemory.IsSupportedNetPrefab(assetEntity, out _))
                 return;
 
-            MertToolState.ActiveTool?.RequestDisable(
-                ToolExitMode.VanillaToolbarClear);
+            MertToolState.ActiveTool?.RequestDisable(ToolExitMode.VanillaToolbarClear);
         }
     }
     [HarmonyPatch(typeof(ToolbarUISystem), "SelectAssetCategory")]
     public static class SelectCategory_ControlledReplayPatch
     {
-        public static bool Prefix(
-            ToolbarUISystem __instance,
-            Entity assetCategory)
+        public static bool Prefix(ToolbarUISystem __instance, Entity assetCategory)
         {
             if (MertToolState.ControlledSelectCategoryReplay)
                 return true;

@@ -203,9 +203,9 @@ namespace MertsToolBox
 
             AddBinding(m_ToolListBinding);
 
-            AddUpdateBinding(new MertPolledBinding<string>( ModId, "ActiveTool", GetActiveToolPipe, "None|None"));
+            AddUpdateBinding(new MertPolledBinding<string>(ModId, "ActiveTool", GetActiveToolPipe, "None|None"));
 
-            AddUpdateBinding(new MertPolledBinding<bool>( ModId, "IsToolBoxAllowed", GetIsToolBoxAllowed, false));
+            AddUpdateBinding(new MertPolledBinding<bool>(ModId, "IsToolBoxAllowed", GetIsToolBoxAllowed, false));
 
             // Shape Bindings
             AddUpdateBinding(new MertPolledBinding<float>(ModId, "ShapeDimension",
@@ -234,6 +234,7 @@ namespace MertsToolBox
                 "ShapeMaxIndex",
                 () => ShapeToolSystem.ShapeDefinitions.Length - 1
             ));
+            AddUpdateBinding(new MertPolledBinding<bool>(ModId, "ShapeIsOneWaySupported", () => m_Shape?.IsCurrentPrefabValidForOneWayPattern() ?? false));
 
             // Helix Bindings
             AddUpdateBinding(new MertPolledBinding<float>(ModId, "HelixDiameter",
@@ -266,6 +267,8 @@ namespace MertsToolBox
                 m_Helix?.m_ClearanceSteps,
                 new ArrayWriter<float>()
             ));
+            AddUpdateBinding(new MertPolledBinding<bool>(ModId, "HelixIsOneWaySupported", () => m_Helix?.IsCurrentPrefabValidForOneWayPattern() ?? false));
+
             AddUpdateBinding(new MertPolledBinding<bool>(ModId, "HelixIsClockwise",
                 () => m_Helix?.GetIsClockwise() ?? true));
 
@@ -296,6 +299,7 @@ namespace MertsToolBox
                 () => m_SoftBlock != null && m_SoftBlock.GetUseStraightCorners()));
             AddUpdateBinding(new MertPolledBinding<bool>(ModId, "SoftBlockStraightCornersSupported",
                 () => m_SoftBlock != null && m_SoftBlock.IsStraightCornersSupported()));
+            AddUpdateBinding(new MertPolledBinding<bool>(ModId, "SoftBlockIsOneWaySupported", () => m_SoftBlock?.IsCurrentPrefabValidForOneWayPattern() ?? false));
 
             // Grid Bindings
             AddUpdateBinding(new MertPolledBinding<int>(ModId, "GridBlockWidth",
@@ -313,13 +317,18 @@ namespace MertsToolBox
             AddUpdateBinding(new MertPolledBinding<bool>(ModId, "GridIsOneWaySupported",
                 () => m_Grid?.IsCurrentPrefabValidForOneWayPattern() ?? false));
 
+            // Direction Bindings
+            AddUpdateBinding(new MertPolledBinding<bool>(ModId, "MainDirectionState",
+                () => GetEnabledTool()?.GetMainDirectionState() ?? true));
+
+
             // Crosswalk Bindings
             AddUpdateBinding(new MertPolledBinding<bool>(ModId, "SuppressCrosswalks",
             () => MertToolState.SuppressCrosswalks, false));
 
             // Elevation Bindings
             AddUpdateBinding(new MertPolledBinding<float>(ModId, "ElevationStepValue",
-                () => GetEnabledMertTool()?.GetElevationStepValue() ?? 10f));
+                () => GetEnabledTool()?.GetElevationStepValue() ?? 10f));
             AddBinding(new ValueBinding<float[]>(
                 ModId,
                 "ElevationStepArray",
@@ -327,11 +336,15 @@ namespace MertsToolBox
                 new ArrayWriter<float>()
             ));
             AddUpdateBinding(new MertPolledBinding<float>(ModId, "ElevationValue",
-                () => GetEnabledMertTool()?.GetCurrentNetToolElevation() ?? 0f));
+                () => GetEnabledTool()?.GetCurrentNetToolElevation() ?? 0f));
 
             // Shared Snap & Toggle Bindings
             AddUpdateBinding(new MertPolledBinding<bool>(ModId, "IsSnapGeometryActive",
-                () => GetEnabledMertTool()?.IsSnapGeometryEnabled() ?? false));
+                () => GetEnabledTool()?.IsSnapGeometryEnabled() ?? false));
+
+            // Flatten Toggle Binding
+            AddUpdateBinding(new MertPolledBinding<bool>(ModId, "IsFlattenActive",
+                () => GetEnabledTool()?.IsFlattenGeometryEnabled() ?? false));
 
             // Action Hints
             AddUpdateBinding(new MertPolledBinding<bool>(ModId, "ShowShapeCtrlWheelHint",
@@ -365,24 +378,32 @@ namespace MertsToolBox
             }));
 
             AddBinding(new TriggerBinding<float>(ModId, "ElevationStep",
-                val => GetEnabledMertTool()?.SetElevationStepFromUi(val)));
+                val => GetEnabledTool()?.SetElevationStepFromUi(val)));
 
             AddBinding(new TriggerBinding(ModId, "ElevationUp",
-                () => GetEnabledMertTool()?.QueueElevationChangeFromUi(+1)));
+                () => GetEnabledTool()?.QueueElevationChangeFromUi(+1)));
 
             AddBinding(new TriggerBinding(ModId, "ElevationDown",
-                () => GetEnabledMertTool()?.QueueElevationChangeFromUi(-1)));
+                () => GetEnabledTool()?.QueueElevationChangeFromUi(-1)));
 
             // Snap Trigger
-            AddBinding(new TriggerBinding(ModId,"ToggleSnap",
-                () => GetEnabledMertTool()?.QueueSnapToggle()));
+            AddBinding(new TriggerBinding(ModId, "ToggleSnap",
+                () => GetEnabledTool()?.QueueSnapToggle()));
+
+            // Direction Trigger
+            AddBinding(new TriggerBinding(ModId, "ToggleMainDirection",
+                () => GetEnabledTool()?.QueueToggleMainDirection()));
 
             // Crosswalk Trigger
             AddBinding(new TriggerBinding(ModId, "ToggleSuppressCrosswalks", () =>
-                {
-                    MertToolState.SuppressCrosswalks = !MertToolState.SuppressCrosswalks;
-                    GetEnabledMertTool()?.QueuePreviewRebuild();
-                }));
+            {
+                MertToolState.SuppressCrosswalks = !MertToolState.SuppressCrosswalks;
+                GetEnabledTool()?.QueuePreviewRebuild();
+            }));
+
+            // Flatten Trigger
+            AddBinding(new TriggerBinding(ModId, "ToggleFlattenGeometry",
+                () => GetEnabledTool()?.QueueFlattenToggle()));
 
             // Shape Triggers
             AddBinding(new TriggerBinding(ModId, "ShapeDimensionUp", () => m_Shape?.QueueDimensionChange(+1)));
@@ -390,7 +411,6 @@ namespace MertsToolBox
             AddBinding(new TriggerBinding<int>(ModId, "ShapeDimensionStep", (val) => m_Shape?.QueueSetDimensionStep(val)));
             AddBinding(new TriggerBinding(ModId, "ShapeSidesUp", () => m_Shape?.QueueSidesChange(+1)));
             AddBinding(new TriggerBinding(ModId, "ShapeSidesDown", () => m_Shape?.QueueSidesChange(-1)));
-
             // Helix Triggers
             AddBinding(new TriggerBinding(ModId, "HelixDiameterUp", () => m_Helix?.QueueDiameterChange(+1)));
             AddBinding(new TriggerBinding(ModId, "HelixDiameterDown", () => m_Helix?.QueueDiameterChange(-1)));
@@ -518,9 +538,6 @@ namespace MertsToolBox
 
         private void OnToolChanged(ToolBaseSystem tool)
         {
-            if (MertToolState.SuppressToolChangedDuringColdstart)
-                return;
-
             if (IsRoadBuilderTool(tool))
             {
                 CloseTools(ToolExitMode.UserSelectionClose);
@@ -598,6 +615,7 @@ namespace MertsToolBox
                 return;
 
             PrefabBase currentPrefab = null;
+
             try
             {
                 currentPrefab = objectTool.GetPrefab();
@@ -696,7 +714,7 @@ namespace MertsToolBox
             m_LastToolListPipe = next;
             return next;
         }
-        private MertBaseToolSystem GetEnabledMertTool()
+        private MertBaseToolSystem GetEnabledTool()
         {
             if (m_Shape?.ToolEnabled == true) return m_Shape;
             if (m_Helix?.ToolEnabled == true) return m_Helix;
@@ -815,7 +833,7 @@ namespace MertsToolBox
             string value = string.Join(";", presets.Select(p =>
                 $"{ToPresetDisplayLabel(p.DisplayName)}|{p.DisplayName}"));
 
-           m_PresetListBinding?.SetValue(value);
+            m_PresetListBinding?.SetValue(value);
         }
 
         private static string ToPresetDisplayLabel(string value)

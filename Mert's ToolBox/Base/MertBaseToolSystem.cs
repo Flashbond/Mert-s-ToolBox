@@ -24,7 +24,6 @@ namespace MertsToolBox
 
         protected static AssetStampPrefab s_SharedRuntimeStamp;
         protected static bool s_SharedStampRegistered;
-        protected static bool s_ObjectToolFoundationWarmed;
 
         protected AssetStampPrefab m_RuntimeStamp;
 
@@ -38,7 +37,20 @@ namespace MertsToolBox
 
         private int m_LastHandedOffRevision = -1;
         private int m_RuntimeStampRevision;
-        public bool ToolEnabled { get; protected set; }
+        private bool m_ToolEnabled;
+        public bool ToolEnabled
+        {
+            get => m_ToolEnabled;
+            protected set
+            {
+                m_ToolEnabled = value;
+
+                if (value)
+                    MertToolState.FlattenOwner = SupportsFlatten ? this : null;
+                else if (MertToolState.FlattenOwner == this)
+                    MertToolState.FlattenOwner = null;
+            }
+        }
         public abstract string ToolId { get; }
         public abstract string ToolName { get; }
 
@@ -61,7 +73,23 @@ namespace MertsToolBox
         private bool m_IsCreatingShape;
         private bool m_PendingObjectToolHandoff;
 
-   
+        protected bool m_LastOneWayEligible = false;
+
+        /// <summary>Tum araclarin paylastigi runtime stamp (instance'siz erisim).</summary>
+        internal static AssetStampPrefab SharedRuntimeStamp => s_SharedRuntimeStamp;
+
+        /// <summary>
+        /// ObjectToolSystem'e en son stamp'i veren aracin Flatten'i destekleyip desteklemedigi.
+        /// Commit aninda MertToolState.ActiveTool null olabildigi icin handoff aninda yakalaniyor.
+        /// </summary>
+        internal static bool LastHandoffSupportsFlatten { get; private set; } = true;
+
+        /// <summary>Handoff anindaki NetTool yuksekligi (0 = zeminde).</summary>
+        internal static float LastHandoffElevation { get; private set; }
+
+        /// <summary>Helix gibi bilincli olarak 3B olan araclar false dondurur.</summary>
+        protected virtual bool SupportsFlatten => true;
+
         #endregion
 
         #region Abstract Core
@@ -69,6 +97,8 @@ namespace MertsToolBox
         /// Processes custom inputs specific to the active tool implementation.
         /// </summary>
         protected abstract void ProcessToolInput();
+        public virtual void QueueToggleMainDirection() { }
+        public virtual bool GetMainDirectionState() => true;
 
         /// <summary>
         /// Attempts to generate the mathematical sub-networks and cells for the selected road prefab.
@@ -115,11 +145,7 @@ namespace MertsToolBox
         /// </summary>
         protected override void OnUpdate()
         {
-            if (!s_ObjectToolFoundationWarmed)
-                TryLatePrebakeWithRealRoad();
-
-            if (!ToolEnabled)
-                return;
+            if (!ToolEnabled) return;
 
             KeepVanillaElevationDisabled();
 
@@ -165,10 +191,8 @@ namespace MertsToolBox
                 Mod.settings.OnSuppressCrosswalkChanged -= OnSuppressCrosswalkSettingsChanged;
             }
 
-            s_CachedSmallRoad = null;
-
-            s_RoadProfileDiscoveryCompleted = false;
-            s_ObjectToolFoundationWarmed = false;
+            if (MertToolState.ActiveTool == this) MertToolState.ActiveTool = null;
+            if (MertToolState.FlattenOwner == this) MertToolState.FlattenOwner = null;
 
             m_ToolSystem = null;
             m_ObjectToolSystem = null;
@@ -190,6 +214,25 @@ namespace MertsToolBox
         /// Flags the system to rebuild the preview shape on the next update loop.
         /// </summary>
         public void QueuePreviewRebuild() { m_PendingCreateShape = true; }
+
+        /// <summary>
+        /// Toggles the global "flatten geometry" mode shared by every shape tool. When active,
+        /// the placed stamp's ObjectGeometryData gets GeometryFlags.HasBase (see
+        /// ApplyFlattenModeToEntity in the Stamp partial), which makes vanilla's own
+        /// ObjectUtils.AdjustPosition place the whole shape as a flat, untilted plane at its
+        /// locally highest terrain corner instead of tilting it to match local slope. Mirrors
+        /// QueueSnapToggle's shape - adjust to match exactly if that one defers via a pending
+        /// flag instead of toggling synchronously.
+        /// </summary>
+        public void QueueFlattenToggle()
+        {
+            MertToolState.FlattenGeometryEnabled = !MertToolState.FlattenGeometryEnabled;
+
+            if (ToolEnabled)
+                QueuePreviewRebuild();
+        }
+
+        public bool IsFlattenGeometryEnabled() => MertToolState.FlattenGeometryEnabled;
 
         /// <summary>
         /// Attempts to mutate the runtime stamp with newly generated geometry and cost metadata.
@@ -402,7 +445,6 @@ namespace MertsToolBox
             return IsTrackLikePrefab(prefab);
         }
 
-
         public static bool IsPierLikePrefab(NetPrefab prefab)
         {
             if (prefab == null || string.IsNullOrEmpty(prefab.name))
@@ -564,6 +606,65 @@ namespace MertsToolBox
         public virtual void ApplyUndoSnapshot(MertToolPreset snapshot)
         {
             ApplyPresetSnapshot(snapshot);
+        }
+        #endregion
+        #region One-Way Pattern Base Logic
+
+        /// <summary>
+        /// Determines if the selected road is functionally a one-way street by examining its
+        /// internal RoadData flags instead of brittle string-based name checks.
+        /// </summary>
+        public virtual bool IsCurrentPrefabValidForOneWayPattern()
+        {
+            NetPrefab roadPrefab = TryGetCurrentSelectedRoadPrefab();
+            if (roadPrefab == null) return false;
+
+            string name = roadPrefab.name.ToLowerInvariant();
+            if (name.Contains("bridge") ||
+                name.Contains("quay") ||
+                name.Contains("pedestrian") ||
+                name.Contains("public transport") ||
+                name.Contains("roundabout"))
+            {
+                return false;
+            }
+
+            Unity.Entities.Entity roadEntity = m_PrefabSystem.GetEntity(roadPrefab);
+            if (roadEntity == Unity.Entities.Entity.Null) return false;
+
+            var entityManager = Unity.Entities.World.DefaultGameObjectInjectionWorld.EntityManager;
+            if (!entityManager.Exists(roadEntity)) return false;
+
+            if (!entityManager.TryGetComponent<Game.Prefabs.RoadData>(roadEntity, out var roadData))
+                return false;
+
+            bool hasForward = (roadData.m_Flags & Game.Prefabs.RoadFlags.DefaultIsForward) != 0;
+            bool hasBackward = (roadData.m_Flags & Game.Prefabs.RoadFlags.DefaultIsBackward) != 0;
+
+            return hasForward ^ hasBackward;
+        }
+
+        protected void EnforceOneWayOnlyOptions()
+        {
+            bool isEligible = IsCurrentPrefabValidForOneWayPattern();
+
+            if (isEligible == m_LastOneWayEligible)
+                return;
+
+            m_LastOneWayEligible = isEligible;
+
+            if (!isEligible)
+            {
+                bool changed = ResetOneWaySpecificOptions();
+
+                if (changed && ToolEnabled)
+                    QueuePreviewRebuild();
+            }
+        }
+
+        protected virtual bool ResetOneWaySpecificOptions()
+        {
+            return false;
         }
         #endregion
     }

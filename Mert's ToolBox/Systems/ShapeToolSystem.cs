@@ -18,8 +18,10 @@ namespace MertsToolBox.Systems
         private int m_PendingDimensionChange = 0;
         private int m_TargetDimensionStep = -1;
 
+        private bool m_IsClockwise = true; 
+        private bool m_PendingToggleDirection = false;
+
         // --- DATA-DRIVEN SHAPE DEFINITIONS ---
-        // Artık şekilleri array ve tuple kullanarak tek merkezden yönetiyoruz.
         public static readonly (int Sides, string Name)[] ShapeDefinitions = new (int, string)[]
         {
             (3, "Triangle"),
@@ -31,7 +33,6 @@ namespace MertsToolBox.Systems
             (0, "Circle")
         };
 
-        // Başlangıç değerini dizinin en son elemanına (Circle) eşitliyoruz. (-1 koyarak taşırma hatasını çözdük)
         private int m_CurrentSidesIndex = ShapeDefinitions.Length - 1;
         private int m_PendingSidesChange = 0;
 
@@ -64,7 +65,7 @@ namespace MertsToolBox.Systems
                 PrefabName = prefabName,
 
                 DisplayName = SanitizeFileName(
-                    $"{ToolId}_{prefabName}_{shapeName}_Dimension{dimension}m" +
+                    $"{ToolId}_{prefabName}_{shapeName}_Dimension{dimension}m_{(m_IsClockwise ? "CW" : "CCW")}" +
                     $"{(MertToolState.SuppressCrosswalks ? "_NoCrosswalks" : "")}"
                 ),
 
@@ -72,7 +73,8 @@ namespace MertsToolBox.Systems
                 {
                     ["Dimension"] = dimension,
                     ["Sides"] = currentSides,
-                    ["NoCrosswalks"] = MertToolState.SuppressCrosswalks ? 1f : 0f
+                    ["Clockwise"] = m_IsClockwise ? 1f : 0f,
+                    ["NoCrosswalks"] = MertToolState.SuppressCrosswalks ? 1f : 0f,
                 }
             };
         }
@@ -98,9 +100,13 @@ namespace MertsToolBox.Systems
             if (preset.Values.TryGetValue("Sides", out float sides))
                 SetSides((int)sides);
 
+            if (preset.Values.TryGetValue("Clockwise", out float clockwise))
+                m_IsClockwise = clockwise > 0.5f;
+
             if (preset.Values.TryGetValue("NoCrosswalks", out float noCrosswalks))
                 MertToolState.SuppressCrosswalks = noCrosswalks >= 0.5f;
 
+        
             QueuePreviewRebuild();
         }
         #endregion
@@ -135,6 +141,13 @@ namespace MertsToolBox.Systems
         }
 
         public void QueueSetDimensionStep(int value) => m_TargetDimensionStep = value;
+
+        public override void QueueToggleMainDirection()
+        {
+            if (!IsCurrentPrefabValidForOneWayPattern()) return;
+            RegisterUndoForButton();
+            m_PendingToggleDirection = true;
+        }
         #endregion
 
         #region Metrics & Data Retrieval
@@ -159,12 +172,21 @@ namespace MertsToolBox.Systems
 
         public int GetCurrentSides() => ShapeDefinitions[m_CurrentSidesIndex].Sides;
         public int GetCurrentSidesIndex() => m_CurrentSidesIndex;
+
+        public override bool GetMainDirectionState() => m_IsClockwise;
         #endregion
 
         #region Core Tool Processing
         protected override void ProcessToolInput()
         {
-            if (!ToolEnabled) return;
+            EnforceOneWayOnlyOptions();
+
+            if (m_PendingToggleDirection)
+            {
+                m_IsClockwise = !m_IsClockwise;
+                m_PendingToggleDirection = false;
+                QueuePreviewRebuild();
+            }
 
             if (m_TargetDimensionStep != -1)
             {
@@ -305,7 +327,7 @@ namespace MertsToolBox.Systems
             return 16;
         }
         /// <summary>
-        /// Draws Circle geometry.
+        /// Draws Shape geometry.
         /// </summary>
         private ObjectSubNetInfo[] BuildShapeSubNets(NetPrefab roadPrefab, float radius, int segments, float elevation)
         {
@@ -327,11 +349,19 @@ namespace MertsToolBox.Systems
             for (int i = 0; i < segments; i++)
             {
                 int next = (i + 1) % segments;
+
+                float3 p0 = points[i];
+                float3 p1 = points[i] + forwardTangents[i] * tangentLength;
+                float3 p2 = points[next] - forwardTangents[next] * tangentLength;
+                float3 p3 = points[next];
+
+                bool reverseDirection = m_IsClockwise;
+
                 result[i] = new ObjectSubNetInfo
                 {
                     m_NetPrefab = roadPrefab,
-                    m_BezierCurve = new Bezier4x3(points[i], points[i] + forwardTangents[i] * tangentLength, points[next] - forwardTangents[next] * tangentLength, points[next]),
-                    m_NodeIndex = new int2(i, next),
+                    m_BezierCurve = reverseDirection ? new Bezier4x3(p3, p2, p1, p0) : new Bezier4x3(p0, p1, p2, p3),
+                    m_NodeIndex = reverseDirection ? new int2(next, i) : new int2(i, next),
                     m_ParentMesh = new int2(-1, -1)
                 };
             }
@@ -366,11 +396,13 @@ namespace MertsToolBox.Systems
                 float3 p1 = p0 + (dir / 3f);
                 float3 p2 = p3 - (dir / 3f);
 
+                bool reverseDirection = m_IsClockwise;
+
                 result[i] = new ObjectSubNetInfo
                 {
                     m_NetPrefab = roadPrefab,
-                    m_BezierCurve = new Bezier4x3(p0, p1, p2, p3),
-                    m_NodeIndex = new int2(i, next),
+                    m_BezierCurve = reverseDirection ? new Bezier4x3(p3, p2, p1, p0) : new Bezier4x3(p0, p1, p2, p3),
+                    m_NodeIndex = reverseDirection ? new int2(next, i) : new int2(i, next),
                     m_ParentMesh = new int2(-1, -1)
                 };
             }

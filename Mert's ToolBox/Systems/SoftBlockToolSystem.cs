@@ -29,6 +29,9 @@ namespace MertsToolBox.Systems
         private int m_TargetLengthStep = -1;
         private float m_PendingBorderRadiushange = 0f;
         private bool m_PendingToggleStraightCorners = false;
+        private bool m_IsClockwise = true;
+        private bool m_PendingToggleDirection = false;
+
 
         private enum BorderRadiusSnapState
         {
@@ -77,7 +80,7 @@ namespace MertsToolBox.Systems
                 PrefabName = prefabName,
 
                 DisplayName = SanitizeFileName(
-                    $"{ToolId}_{prefabName}_Dimensions{width}x{length}m_Radius{radius:0.0}"+
+                    $"{ToolId}_{prefabName}_Dimensions{width}x{length}m_Radius{radius:0.0}_{(m_IsClockwise ? "CW" : "CCW")}" +
                     $"{(m_UseStraightCorners ? "_StraightCorners" : "")}"+
                     $"{(MertToolState.SuppressCrosswalks ? "_NoCrosswalks" : "")}"
                 ),
@@ -87,6 +90,7 @@ namespace MertsToolBox.Systems
                     ["Width"] = width,
                     ["Length"] = length,
                     ["BorderRadius"] = radius,
+                    ["Clockwise"] = m_IsClockwise ? 1f : 0f,
                     ["StraightCorners"] = m_UseStraightCorners ? 1f : 0f,
                     ["NoCrosswalks"] = MertToolState.SuppressCrosswalks ? 1f : 0f
                 }
@@ -106,6 +110,9 @@ namespace MertsToolBox.Systems
 
             if (preset.Values.TryGetValue("BorderRadius", out float radius))
                 SetCurrentBorderRadius(radius, useSnap: false);
+
+            if (preset.Values.TryGetValue("Clockwise", out float clockwise))
+                m_IsClockwise = clockwise >= 0.5f;
 
             if (preset.Values.TryGetValue("StraightCorners", out float corners))
                 m_UseStraightCorners = corners >= 0.5f;
@@ -199,6 +206,14 @@ namespace MertsToolBox.Systems
         {
             SetCurrentBorderRadius(value, useSnap: true);
         }
+
+        public override void QueueToggleMainDirection()
+        {
+            if (!IsCurrentPrefabValidForOneWayPattern()) return;
+            RegisterUndoForButton();
+            m_PendingToggleDirection = true;
+        }
+
         public void QueueToggleStraightCorners()
         {
             if (!IsStraightCornersSupported())
@@ -208,6 +223,7 @@ namespace MertsToolBox.Systems
             m_PendingToggleStraightCorners = true;
         }
 
+        public override bool GetMainDirectionState() => m_IsClockwise;
         public bool GetUseStraightCorners() => m_UseStraightCorners;
 
         public bool IsStraightCornersSupported()
@@ -259,7 +275,14 @@ namespace MertsToolBox.Systems
         /// </summary>
         protected override void ProcessToolInput()
         {
-            if (!ToolEnabled) return;
+            EnforceOneWayOnlyOptions();
+
+            if (m_PendingToggleDirection)
+            {
+                m_IsClockwise = !m_IsClockwise;
+                m_PendingToggleDirection = false;
+                QueuePreviewRebuild();
+            }
 
             if (m_TargetWidthStep != -1)
             {
@@ -656,13 +679,18 @@ namespace MertsToolBox.Systems
             RotateCurveStart(curves, 2);
             ObjectSubNetInfo[] result = new ObjectSubNetInfo[curves.Count];
 
+            bool reverseDirection = m_IsClockwise;
+
             for (int i = 0; i < curves.Count; i++)
             {
+                Bezier4x3 c = curves[i];
+                int next = (i + 1) % curves.Count;
+
                 result[i] = new ObjectSubNetInfo
                 {
                     m_NetPrefab = roadPrefab,
-                    m_BezierCurve = curves[i],
-                    m_NodeIndex = new int2(i, (i + 1) % curves.Count),
+                    m_BezierCurve = reverseDirection ? new Bezier4x3(c.d, c.c, c.b, c.a) : c,
+                    m_NodeIndex = reverseDirection ? new int2(next, i) : new int2(i, next),
                     m_ParentMesh = new int2(-1, -1)
                 };
             }

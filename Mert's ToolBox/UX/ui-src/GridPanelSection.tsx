@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { trigger, call, bindValue, useValue } from "cs2/api";
-import crossWalkIcon from "./Icons/CrossWalk.svg";
-import alternatingIcon from "./Icons/Alternating.svg";
-import orientationIcon from "./Icons/Orientation.svg";
+import crossWalkIcon from "./icons/CrossWalk.svg";
+import alternatingIcon from "./icons/Alternating.svg";
+import orientationIcon from "./icons/Orientation.svg";
+import flattenIcon from "./icons/Flatten.svg";
 import { formatMeters, formatUnits, formatSmart } from "./utils/Formatters";
 import { VanillaResolver } from "./utils/VanilliaResolver";
 import { parseActiveTool } from "./utils/ActiveTool";
@@ -27,6 +28,7 @@ const elevationStepValue$ = bindValue<number>("MertsToolBox", "ElevationStepValu
 const elevationStepArray$ = bindValue<number[]>("MertsToolBox", "ElevationStepArray");
 
 const isSnapGeometryActive$ = bindValue<boolean>("MertsToolBox", "IsSnapGeometryActive");
+const isFlattenActive$ = bindValue<boolean>("MertsToolBox", "IsFlattenActive");
 
 const gridIsOneWaySupported$ = bindValue<boolean>("MertsToolBox", "GridIsOneWaySupported");
 
@@ -80,6 +82,7 @@ export const GridPanelSection = () => {
     const elevationStepValues = useValue(elevationStepArray$) as number[];
 
     const isSnapGeometryActive = useValue(isSnapGeometryActive$) as boolean;
+    const isFlattenActive = useValue(isFlattenActive$) as boolean;
 
     const presetListRaw = useValue(presetList$) as string;
 
@@ -202,7 +205,7 @@ export const GridPanelSection = () => {
                     tooltip={
                         !isOneWaySupported
                             ? "REQUIRES ONE-WAY ROAD"
-                            : (isAlternating ? "Parallel road directions alternate" : "Parallel roads lead in the same direction")
+                            : (isAlternating ? "Parallel road directions alternate" : "Parallel roads heads the same direction")
                     }
                     focusKey={VanillaResolver.instance.FOCUS_DISABLED}
                     onSelect={() => trigger("MertsToolBox", "GridToggleAlternating")}
@@ -259,15 +262,26 @@ export const GridPanelSection = () => {
             </VanillaResolver.instance.Section>
 
             {/* SNAP ROW */}
-                <VanillaResolver.instance.Section title="Snap">
-                    <VanillaResolver.instance.ToolButton
-                        src="Media/Tools/Snap Options/ExistingGeometry.svg"
-                        selected={isSnapGeometryActive}
-                        focusKey={VanillaResolver.instance.FOCUS_DISABLED}
-                        onSelect={() => trigger("MertsToolBox", "ToggleSnap")}
-                        tooltip={`Snap to existing geometry`}
-                    />
-                </VanillaResolver.instance.Section>
+            <VanillaResolver.instance.Section title="Snap">
+                <VanillaResolver.instance.ToolButton
+                    src="Media/Tools/Snap Options/ExistingGeometry.svg"
+                    selected={isSnapGeometryActive}
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    onSelect={() => trigger("MertsToolBox", "ToggleSnap")}
+                    tooltip={`Snap to existing geometry`}
+                />
+            </VanillaResolver.instance.Section>
+
+            {/* FLATTEN ROW */}
+            <VanillaResolver.instance.Section title="Flatten">
+                <VanillaResolver.instance.ToolButton
+                    src={flattenIcon}
+                    selected={isFlattenActive}
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    onSelect={() => trigger("MertsToolBox", "ToggleFlattenGeometry")}
+                    tooltip={isFlattenActive ? "Shape stays flat; ignores terrain" : "Shape follows terrain"}
+                />
+            </VanillaResolver.instance.Section>
 
             {/* MERT LISTBOX (KLASİK) */}
             <MertListBox

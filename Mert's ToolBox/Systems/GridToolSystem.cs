@@ -1,4 +1,3 @@
-using Colossal.Entities;
 using Colossal.Mathematics;
 using Game.Prefabs;
 using MertsToolBox.Core;
@@ -7,7 +6,7 @@ using MertsToolBox.Utilities.Preset;
 using System.Collections.Generic;
 using Unity.Mathematics;
 
-namespace MertsToolBox
+namespace MertsToolBox.Systems
 {
     public partial class GridToolSystem : MertBaseToolSystem
     {
@@ -25,8 +24,6 @@ namespace MertsToolBox
         private int m_PendingRowsChange = 0;
         private bool m_PendingToggleAlternating = false;
         private bool m_PendingToggleOrientation = false;
-
-        private bool m_LastOneWayEligible = false;
 
         /// <summary>
         /// Gets the name of the tool.
@@ -224,68 +221,23 @@ namespace MertsToolBox
         /// </summary>
         public bool GetIsOrientationLeftBottom() => m_IsOrientationLeftBottom;
 
-        /// <summary>
-        /// Determines if the selected road is functionally a one-way street by examining its
-        /// internal RoadData flags instead of brittle string-based name checks.
-        /// </summary>
-        public bool IsCurrentPrefabValidForOneWayPattern()
+        protected override bool ResetOneWaySpecificOptions()
         {
-            NetPrefab roadPrefab = TryGetCurrentSelectedRoadPrefab();
-            if (roadPrefab == null) return false;
+            bool changed = false;
 
-            string name = roadPrefab.name.ToLowerInvariant();
-            if (name.Contains("bridge") ||
-                name.Contains("quay") ||
-                name.Contains("pedestrian") ||
-                name.Contains("public transport") ||
-                name.Contains("roundabout"))
+            if (m_IsAlternating)
             {
-                return false;
+                m_IsAlternating = false;
+                changed = true;
             }
 
-            Unity.Entities.Entity roadEntity = m_PrefabSystem.GetEntity(roadPrefab);
-            if (roadEntity == Unity.Entities.Entity.Null) return false;
-
-            var entityManager = Unity.Entities.World.DefaultGameObjectInjectionWorld.EntityManager;
-            if (!entityManager.Exists(roadEntity)) return false;
-
-            if (!entityManager.TryGetComponent<Game.Prefabs.RoadData>(roadEntity, out var roadData))
-                return false;
-
-            bool hasForward = (roadData.m_Flags & Game.Prefabs.RoadFlags.DefaultIsForward) != 0;
-            bool hasBackward = (roadData.m_Flags & Game.Prefabs.RoadFlags.DefaultIsBackward) != 0;
-
-            return hasForward ^ hasBackward;
-        }
-
-        private void EnforceOneWayOnlyOptions()
-        {
-            bool isEligible = IsCurrentPrefabValidForOneWayPattern();
-
-            if (isEligible == m_LastOneWayEligible)
-                return;
-
-            m_LastOneWayEligible = isEligible;
-
-            if (!isEligible)
+            if (m_IsOrientationLeftBottom)
             {
-                bool changed = false;
-
-                if (m_IsAlternating)
-                {
-                    m_IsAlternating = false;
-                    changed = true;
-                }
-
-                if (m_IsOrientationLeftBottom)
-                {
-                    m_IsOrientationLeftBottom = false;
-                    changed = true;
-                }
-
-                if (changed && ToolEnabled)
-                    QueuePreviewRebuild();
+                m_IsOrientationLeftBottom = false;
+                changed = true;
             }
+
+            return changed;
         }
         #endregion
 
@@ -295,8 +247,6 @@ namespace MertsToolBox
         /// </summary>
         protected override void ProcessToolInput()
         {
-            if (!ToolEnabled) return;
-
             EnforceOneWayOnlyOptions();
 
             if (m_PendingBlockWidthChange != 0) { ChangeBlockWidth(m_PendingBlockWidthChange); m_PendingBlockWidthChange = 0; }
