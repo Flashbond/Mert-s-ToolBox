@@ -108,17 +108,7 @@ namespace MertsToolBox.Settings
                 OnSuppressCrosswalkChanged?.Invoke();
             }
         }
-        public bool SuppressTrafficLights
-        {
-            get => m_SuppressTrafficLights;
-            set
-            {
-                if (m_SuppressTrafficLights == value) return;
 
-                m_SuppressTrafficLights = value;
-                OnSuppressTrafficLightsChanged?.Invoke();
-            }
-        }
         // -------------------------
         // Shape
         // -------------------------
@@ -328,6 +318,19 @@ namespace MertsToolBox.Settings
 
                 m_DefaultRows = clamped;
                 OnToolParametersChanged?.Invoke(4, 4);
+            }
+        }
+
+        [SettingsUISection(TAB_GRID, GROUP_DEFAULTS)]
+        public bool SuppressTrafficLights
+        {
+            get => m_SuppressTrafficLights;
+            set
+            {
+                if (m_SuppressTrafficLights == value) return;
+
+                m_SuppressTrafficLights = value;
+                OnSuppressTrafficLightsChanged?.Invoke();
             }
         }
 

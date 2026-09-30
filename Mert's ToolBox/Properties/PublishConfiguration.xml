@@ -10,7 +10,79 @@
 
 	<!--Long description of the mod-->
 	<LongDescription>
-		Create perfectly geometric roads with live preview and precise control.
+		One tool to shape them all.
+
+		# Now Anarchy is not a requirement for Procedural Helix Tool
+		The Helix tool can now be used without Anarchy. A new **Building Mode** row at the top of the Helix panel lets you choose how your helix is built:
+
+		- **Anarchy (recommended):** Selected by default when Anarchy is installed. Your own Anarchy setting is restored as soon as you close the Helix tool.
+		- **Mert's ToolBox (experimental):** Builds the helix with Mert's ToolBox's own collision handling, so Anarchy is not needed.
+
+		**❗ Please note:** Mert's ToolBox mode is still **experimental**. **Don't try it on your main city first. Test it on a copy of your save, and always keep a backup.**
+
+		# New Feature: Flatten
+		**Flatten **makes placing roads on uneven terrain dramatically smoother.
+
+		It perfectly reshapes the surrounding terrain to match the road's target height by **cutting through hills, filling valleys, and creating the necessary slopes** so you can get a clean, level road placement without fighting the terrain.
+
+		And it does this in a way that goes beyond the vanilla game:
+
+		-  **See the finished terrain before placing the road.** The preview shows the terrain exactly as it will be shaped, including cuts, fills, and slopes.
+		- ** No temporary terrain entities.** The terrain is prepared directly without creating extra entities, so nothing unnecessary is added to your city or save.
+		-  **What you see is what you get.** The terrain shown in the preview is the terrain that gets committed. In our measurements, the difference is only a few centimeters.
+
+		In short: **shape the terrain first, see exactly what you're getting, then place your road.**
+		No more guessing. No more placing a road and discovering that the terrain had other plans.
+
+		# ⚠️ Community Fix: crashes in cities with many intersections
+
+		Cities: Skylines II has a bug in the base game that can crash it to desktop once a city has a lot of road intersections, for example several large road grids. The game reserves room for road terrain data based on a simple count of your roads, and that estimate is too small for roads that meet at intersections. When the space runs out, the game keeps writing anyway and damages other parts of memory, which leads to a crash a little later in some unrelated place. It has nothing to do with your hardware or the size of your roads, and it happens in the vanilla game as well.
+
+		Mert's ToolBox includes a community fix for this. It only makes the game reserve enough room for that data, costs a few extra MB of memory, and changes nothing else. Your save files are not affected in any way, since this data is never stored in the save and is rebuilt every time a city is loaded. You can add or remove the mod at any time without risk to your cities. The issue has been reported to the developers, and the fix will stay in ToolBox until it is fixed in the game itself.
+
+		# Included Tools:
+		- 	**Perfect Shape:** Flawless circular and polygonal roundabouts
+		- 	**Procedural Helix:** Multi-level spiral interchanges and ramps
+		- 	**Soft Block:** Smooth, continuous rectangular road networks
+		- 	**Smart Grid:** Perfectly aligned, customizable city blocks
+
+		# Features:
+		- 	Precise parameter adjustments (e.g., Ctrl + Mouse Wheel)
+		- 	Robust support for snapping and elevation modes
+		- 	Real-time cost calculation preview
+		- 	Displays precise measurements (meters, units, and angles)
+		- 	Dedicated native tool panel for easy control
+		- 	Supports custom roads created with Road Builder
+		- 	Hotkeys for quick Access to tools
+		- 	Undo/Redo history
+		- 	Save/Load presets
+
+		# Perfect for:
+		- 	Flawless roundabouts and decorative plazas
+		- 	Complex, multi-level spiral highway interchanges
+		- 	Symmetrical and continuous road designs
+		- 	Massive, perfectly aligned city grid layouts
+
+		# Disclaimer:
+		- 	Procedural Helix tool requires Anarchy mod in order to preserve vanilla experience.
+		- 	Currently supports standard road types only. Some road types (bridges, quays, pedestrian paths, etc..) are intentionally restricted to maintain geometric consistency and stability.
+		- 	Custom road selection is supported via vanilla Roads panel only.
+
+		# Bug Reporting:
+		It is very important to provide this three information with your feedback:
+		1. 	When it happens? It is very important for pinpointing the triggering event. (During Save, during Load, during Exit, etc...)
+		1. 	Is the mod in use? Are any of the tools open or does the error occur during normal gameplay?
+		1. 	Is there a exception window? What does it say? Please copy and paste the message. It is crucial to understand the cause.
+
+		# ❤️ Special Thanks
+		**River-mochi** - follow ups, tech feedbacks, testing
+		**StarQ** - tech feedbacks, testing
+
+		# Community &amp;Feedback
+		**Official Discussion Hub:** Please join the conversation and share your feedback on my official Paradox Plaza forum thread. I’d love to hear your thoughts and ideas.
+		**Where to reach me:**
+		- 	💬 **Reddit:** Post your screenshots or feedback on r/CitiesSkylines and tag me or send a DM to ***/u/EmotionalCourse6266***
+		- 	✉️ **Direct:** flashbond@gmail.com
 	</LongDescription>
 
 	<!--Thumbnail-->
@@ -34,7 +106,7 @@
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/merts-perfect-circle-feedback-suggestions-bug-reports.1911521/" />
 
 	<!--Version of the mod-->
-	<ModVersion Value="1.0.5" />
+	<ModVersion Value="1.0.6" />
 
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.6.*" />

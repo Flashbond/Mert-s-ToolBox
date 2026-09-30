@@ -427,7 +427,7 @@ namespace MertsToolBox
                     if (!setOk)
                         return;
 
-                    //m_ObjectToolSystem.InitializeRaycast();
+                    m_ObjectToolSystem.InitializeRaycast();
 
                     m_LastHandedOffStamp = stamp;
                     m_LastHandedOffRevision = m_RuntimeStampRevision;
