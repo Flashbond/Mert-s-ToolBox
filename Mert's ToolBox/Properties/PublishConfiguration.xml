@@ -119,9 +119,7 @@
 
 	<!--Change log for new version-->
 	<ChangeLog>
-		- New Feature: Suppressed traffic lights for the Smart Grid Tool.
-		- Anarchy is not a requirement for the Procedural Helix Tool.
-		- Improved Flatten System.
+		- Community Fix: crashes in cities with many intersections
 	</ChangeLog>
 
 	<!--External links-->
