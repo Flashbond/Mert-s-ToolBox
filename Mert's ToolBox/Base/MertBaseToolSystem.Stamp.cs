@@ -1,4 +1,4 @@
-﻿using Colossal.Entities;
+using Colossal.Entities;
 using Game.Prefabs;
 using Game.Tools;
 using MertsToolBox.Core;
@@ -113,9 +113,9 @@ namespace MertsToolBox
         private void ApplyFlattenModeToEntity(Entity targetEntity)
         {
             if (targetEntity == Entity.Null || !EntityManager.Exists(targetEntity)) return;
- 
+
             if (!EntityManager.TryGetComponent(targetEntity, out ObjectGeometryData geometryData)) return;
-            
+
             Game.Objects.GeometryFlags newFlags = MertToolState.FlattenGeometryEnabled
                 ? geometryData.m_Flags | Game.Objects.GeometryFlags.HasBase
                 : geometryData.m_Flags & ~Game.Objects.GeometryFlags.HasBase;
@@ -294,11 +294,11 @@ namespace MertsToolBox
         internal bool TryGetActiveSubNetRoadPrefabs(NativeList<Entity> results)
         {
             if (m_RuntimeStamp == null) return false;
-            
+
             if (!TryResolveRuntimeStampEntity(m_RuntimeStamp, out Entity stampEntity)) return false;
-            
+
             if (!EntityManager.HasBuffer<Game.Prefabs.SubNet>(stampEntity)) return false;
-            
+
             DynamicBuffer<Game.Prefabs.SubNet> subNets = EntityManager.GetBuffer<Game.Prefabs.SubNet>(stampEntity);
             for (int i = 0; i < subNets.Length; i++)
             {
@@ -427,7 +427,7 @@ namespace MertsToolBox
                     if (!setOk)
                         return;
 
-                    m_ObjectToolSystem.InitializeRaycast();
+                    //m_ObjectToolSystem.InitializeRaycast();
 
                     m_LastHandedOffStamp = stamp;
                     m_LastHandedOffRevision = m_RuntimeStampRevision;

@@ -7,6 +7,8 @@ using MertsToolBox.Core;
 using MertsToolBox.Management;
 using MertsToolBox.Settings;
 using MertsToolBox.Systems;
+using MertsToolBox.UI;
+using MertsToolBox.Utilities;
 using MertsToolBox.Utilities.Preset;
 using System;
 using System.Collections.Generic;
@@ -267,10 +269,15 @@ namespace MertsToolBox
                 m_Helix?.m_ClearanceSteps,
                 new ArrayWriter<float>()
             ));
-            AddUpdateBinding(new MertPolledBinding<bool>(ModId, "HelixIsOneWaySupported", () => m_Helix?.IsCurrentPrefabValidForOneWayPattern() ?? false));
-
+            AddUpdateBinding(new MertPolledBinding<bool>(ModId, "HelixIsOneWaySupported",
+                () => m_Helix?.IsCurrentPrefabValidForOneWayPattern() ?? false));
             AddUpdateBinding(new MertPolledBinding<bool>(ModId, "HelixIsClockwise",
                 () => m_Helix?.GetIsClockwise() ?? true));
+            // Helix Build Option Bindings
+            AddUpdateBinding(new MertPolledBinding<bool>(ModId, "HelixAnarchyInstalled",
+                () => MertHelixBuildOption.IsAnarchyInstalled, false));
+            AddUpdateBinding(new MertPolledBinding<int>(ModId, "HelixBuildMode",
+                () => (int)MertHelixBuildOption.Current, 0));
 
             // SoftBlock Bindings
             AddUpdateBinding(new MertPolledBinding<float>(ModId, "SoftBlockWidth",
@@ -344,7 +351,11 @@ namespace MertsToolBox
 
             // Flatten Toggle Binding
             AddUpdateBinding(new MertPolledBinding<bool>(ModId, "IsFlattenActive",
-                () => GetEnabledTool()?.IsFlattenGeometryEnabled() ?? false));
+                () => MertToolState.FlattenGeometryEnabled, false));
+
+            // TrafficLights Toggle Binding
+            AddUpdateBinding(new MertPolledBinding<bool>(ModId, "SuppressTrafficLights",
+                () => MertToolState.SuppressTrafficLights, false));
 
             // Action Hints
             AddUpdateBinding(new MertPolledBinding<bool>(ModId, "ShowShapeCtrlWheelHint",
@@ -405,13 +416,22 @@ namespace MertsToolBox
             AddBinding(new TriggerBinding(ModId, "ToggleFlattenGeometry",
                 () => GetEnabledTool()?.QueueFlattenToggle()));
 
+            // TrafficLights Trigger
+            AddBinding(new TriggerBinding(ModId, "ToggleSuppressTrafficLights", () =>
+            {
+                MertToolState.SuppressTrafficLights = !MertToolState.SuppressTrafficLights;
+                GetEnabledTool()?.QueuePreviewRebuild();
+            }));
+
             // Shape Triggers
             AddBinding(new TriggerBinding(ModId, "ShapeDimensionUp", () => m_Shape?.QueueDimensionChange(+1)));
             AddBinding(new TriggerBinding(ModId, "ShapeDimensionDown", () => m_Shape?.QueueDimensionChange(-1)));
             AddBinding(new TriggerBinding<int>(ModId, "ShapeDimensionStep", (val) => m_Shape?.QueueSetDimensionStep(val)));
             AddBinding(new TriggerBinding(ModId, "ShapeSidesUp", () => m_Shape?.QueueSidesChange(+1)));
             AddBinding(new TriggerBinding(ModId, "ShapeSidesDown", () => m_Shape?.QueueSidesChange(-1)));
+
             // Helix Triggers
+            AddBinding(new TriggerBinding<int>(ModId, "HelixSetBuildMode", (mode) => MertHelixBuildOption.Select((HelixBuildMode)mode)));
             AddBinding(new TriggerBinding(ModId, "HelixDiameterUp", () => m_Helix?.QueueDiameterChange(+1)));
             AddBinding(new TriggerBinding(ModId, "HelixDiameterDown", () => m_Helix?.QueueDiameterChange(-1)));
             AddBinding(new TriggerBinding<int>(ModId, "HelixDiameterStep", (val) => m_Helix?.QueueSetDiameterStep(val)));

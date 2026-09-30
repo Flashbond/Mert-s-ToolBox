@@ -3,6 +3,7 @@ using Game.Prefabs;
 using Game.Tools;
 using MertsToolBox.Core;
 using MertsToolBox.Management;
+using MertsToolBox.UI;
 using MertsToolBox.Utilities.Preset;
 using System.Collections.Generic;
 using Unity.Mathematics;
@@ -25,7 +26,7 @@ namespace MertsToolBox.Systems
         private int m_CurrentClearanceStepIndex = 0;
 
         private const float k_GlobalMaxSlope = 0.15f;
-
+        private const float k_EntryTailPillarMargin = 2.0f;
         private const int k_MaxDiameter = 940;
         private const int k_PierMaxDiameter = 15;
 
@@ -52,12 +53,12 @@ namespace MertsToolBox.Systems
         protected override bool RequiresSnapEnforcement => false;
         protected override bool OverridesObjectToolSnapMask => true;
         protected override bool WritesSubNetSnapMetadata => false;
-
         protected override bool SupportsFlatten => false;
 
         protected override Snap GetObjectToolSnapMask()
         {
-            return Snap.ExistingGeometry | Snap.NetArea;
+            bool isPier = IsCurrentPierLikePrefab();
+            return isPier ? Snap.ExistingGeometry : Snap.ExistingGeometry | Snap.NetArea;
         }
         #endregion
 
@@ -78,7 +79,7 @@ namespace MertsToolBox.Systems
                 PrefabName = prefabName,
 
                 DisplayName = SanitizeFileName(
-                    $"{ToolId}_{prefabName}_Diameter{diameter}m_Turn{turns:0.0}_Clearance{clearance:0.0}m_{(m_IsClockwise ? "CW" : "CCW")}_{(m_IsAscending ? "Up" : "Down")}" +
+                    $"{ToolId}_{prefabName}_Diameter{diameter}m_Turn{turns:0.0}_Clearance{clearance:0.0}m_{(m_IsAscending ? "Up" : "Down")}_{(m_IsClockwise ? "CW" : "CCW")}" +
                     $"{(MertToolState.SuppressCrosswalks ? "_NoCrosswalks" : "")}"
                 ),
 
@@ -87,8 +88,8 @@ namespace MertsToolBox.Systems
                     ["Diameter"] = diameter,
                     ["Turns"] = turns,
                     ["Clearance"] = clearance,
+                    ["Climbing"] = m_IsAscending ? 1f : 0f,
                     ["Clockwise"] = m_IsClockwise ? 1f : 0f,
-                    ["Ascending"] = m_IsAscending ? 1f : 0f, // YENİ
                     ["NoCrosswalks"] = MertToolState.SuppressCrosswalks ? 1f : 0f
                 }
             };
@@ -108,11 +109,11 @@ namespace MertsToolBox.Systems
             if (preset.Values.TryGetValue("Clearance", out float clearance))
                 SetCurrentClearance(clearance);
 
+            if (preset.Values.TryGetValue("Climbing", out float ascending))
+                m_IsAscending = ascending > 0.5f;
+
             if (preset.Values.TryGetValue("Clockwise", out float clockwise))
                 m_IsClockwise = clockwise > 0.5f;
-
-            if (preset.Values.TryGetValue("Ascending", out float ascending))
-                m_IsAscending = ascending > 0.5f;
 
             if (preset.Values.TryGetValue("NoCrosswalks", out float noCrosswalks))
                 MertToolState.SuppressCrosswalks = noCrosswalks >= 0.5f;
@@ -260,7 +261,7 @@ namespace MertsToolBox.Systems
         }
         private float GetMinimumAllowedClearance()
         {
-            return IsCurrentPierLikePrefab() ? 3.5f : 9.0f;
+            return IsCurrentPierLikePrefab() ? 3.5f : 10.0f;
         }
         private float GetMaximumAllowedClearance()
         {
@@ -272,7 +273,11 @@ namespace MertsToolBox.Systems
         /// <summary>
         /// Called when the tool is activated to handle state cleanup or initialization.
         /// </summary>
-        protected override void OnToolActivated() { MertToolState.HelixCleanupRequested = true; }
+        protected override void OnToolActivated()
+        {
+            MertToolState.HelixCleanupRequested = true;
+            MertHelixBuildOption.OnHelixOpened();
+        }
 
         /// <summary>
         /// Called when the tool is deactivated to perform necessary cleanup flags.
@@ -281,9 +286,16 @@ namespace MertsToolBox.Systems
         {
             MertToolState.HelixCleanupRequested = false;
             MertToolState.ActiveHelixUsesPierLikePrefab = false;
+            MertHelixBuildOption.OnHelixClosed();
 
             if (m_ObjectToolSystem != null)
                 m_ObjectToolSystem.selectedSnap = MertToolState.BuildGlobalSnapMask();
+        }
+
+        protected override void OnDestroy()
+        {
+            MertHelixBuildOption.OnHelixClosed();
+            base.OnDestroy();
         }
         #endregion
 
@@ -293,6 +305,7 @@ namespace MertsToolBox.Systems
         /// </summary>
         protected override void ProcessToolInput()
         {
+            MertHelixBuildOption.Update();
             EnforceOneWayOnlyOptions();
 
             if (m_PendingToggleAscension)
@@ -476,7 +489,18 @@ namespace MertsToolBox.Systems
 
             float entryTailLength = isPier ? 1.5f : 0.8f;
             float exitTailLength = isPier ? 0.5f : 1.0f;
+            if (!isPier)
+            {
+                float w = m_CurrentRoadWidth;
+                float outer = buildRadius + 0.5f * w + k_EntryTailPillarMargin;
+                float inner = buildRadius - 0.5f * w;
+                float clearLen = math.sqrt(math.max(0f, outer * outer - inner * inner));
 
+                float requiredFactor = clearLen / buildRadius;
+                if (requiredFactor > entryTailLength)
+                    entryTailLength = requiredFactor;
+                   
+            }
             widthCells = depthCells = (int)math.ceil(m_CurrentSessionDiameter / 8f);
             costElevation = m_CurrentSessionClearance * turns;
 

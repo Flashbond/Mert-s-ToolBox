@@ -46,9 +46,17 @@ namespace MertsToolBox
                 m_ToolEnabled = value;
 
                 if (value)
+                {
                     MertToolState.FlattenOwner = SupportsFlatten ? this : null;
-                else if (MertToolState.FlattenOwner == this)
-                    MertToolState.FlattenOwner = null;
+                    MertToolState.TrafficLightOwner = SupportsTrafficLightSuppression ? this : null;
+                }
+                else
+                {
+                    if (MertToolState.FlattenOwner == this)
+                        MertToolState.FlattenOwner = null;
+                    if (MertToolState.TrafficLightOwner == this)
+                        MertToolState.TrafficLightOwner = null;
+                }
             }
         }
         public abstract string ToolId { get; }
@@ -61,8 +69,8 @@ namespace MertsToolBox
         protected bool m_ContextRecipeReady;
 
         protected Game.Objects.PlacementFlags m_DesiredPlacementFlags =
-                    Game.Objects.PlacementFlags.RoadEdge |
-                    Game.Objects.PlacementFlags.RoadSide;
+                   Game.Objects.PlacementFlags.RoadEdge |
+                   Game.Objects.PlacementFlags.RoadSide;
 
         protected virtual bool RequiresSnapEnforcement => true;
         protected virtual bool OverridesObjectToolSnapMask => true;
@@ -75,20 +83,19 @@ namespace MertsToolBox
 
         protected bool m_LastOneWayEligible = false;
 
-        /// <summary>Tum araclarin paylastigi runtime stamp (instance'siz erisim).</summary>
         internal static AssetStampPrefab SharedRuntimeStamp => s_SharedRuntimeStamp;
 
         /// <summary>
-        /// ObjectToolSystem'e en son stamp'i veren aracin Flatten'i destekleyip desteklemedigi.
-        /// Commit aninda MertToolState.ActiveTool null olabildigi icin handoff aninda yakalaniyor.
+        /// Is Flatten supported by any of the tools.
         /// </summary>
         internal static bool LastHandoffSupportsFlatten { get; private set; } = true;
-
-        /// <summary>Handoff anindaki NetTool yuksekligi (0 = zeminde).</summary>
         internal static float LastHandoffElevation { get; private set; }
-
-        /// <summary>Helix gibi bilincli olarak 3B olan araclar false dondurur.</summary>
         protected virtual bool SupportsFlatten => true;
+
+        /// <summary>
+        /// Is TrafficLights Suppression supported by any of the tools.
+        /// </summary>
+        protected virtual bool SupportsTrafficLightSuppression => false;
 
         #endregion
 
@@ -137,6 +144,8 @@ namespace MertsToolBox
                 Mod.settings.OnToolParametersChanged += RetrieveParametersFromSettings;
                 Mod.settings.OnSuppressCrosswalkChanged += OnSuppressCrosswalkSettingsChanged;
                 OnSuppressCrosswalkSettingsChanged();
+                Mod.settings.OnSuppressTrafficLightsChanged += OnSuppressTrafficLightsSettingsChanged;
+                OnSuppressTrafficLightsSettingsChanged();
             }
         }
 
@@ -160,16 +169,6 @@ namespace MertsToolBox
                 HandleExecuteCreateShape();
         }
 
-        protected void OnSuppressCrosswalkSettingsChanged()
-        {
-            MertToolState.SuppressCrosswalks = Mod.settings?.SuppressCrosswalks ?? false;
-
-            if (!ToolEnabled)
-                return;
-
-            QueuePreviewRebuild();
-        }
-
         private void KeepVanillaElevationDisabled()
         {
             try
@@ -189,10 +188,12 @@ namespace MertsToolBox
             {
                 Mod.settings.OnToolParametersChanged -= RetrieveParametersFromSettings;
                 Mod.settings.OnSuppressCrosswalkChanged -= OnSuppressCrosswalkSettingsChanged;
+                Mod.settings.OnSuppressTrafficLightsChanged -= OnSuppressTrafficLightsSettingsChanged;
             }
 
             if (MertToolState.ActiveTool == this) MertToolState.ActiveTool = null;
             if (MertToolState.FlattenOwner == this) MertToolState.FlattenOwner = null;
+            if (MertToolState.TrafficLightOwner == this) MertToolState.TrafficLightOwner = null;
 
             m_ToolSystem = null;
             m_ObjectToolSystem = null;
@@ -232,7 +233,32 @@ namespace MertsToolBox
                 QueuePreviewRebuild();
         }
 
-        public bool IsFlattenGeometryEnabled() => MertToolState.FlattenGeometryEnabled;
+        /// <summary>
+        /// Toggles the global "Remove Traffic Lights" mode shared by every shape tool.
+        /// </summary>
+        protected void OnSuppressTrafficLightsSettingsChanged()
+        {
+            MertToolState.SuppressTrafficLights = Mod.settings?.SuppressTrafficLights ?? false;
+
+            if (!ToolEnabled)
+                return;
+
+            QueuePreviewRebuild();
+        }
+
+        /// <summary>
+        /// Toggles the global "Remove Crosswlaks" mode shared by every shape tool.
+        /// </summary>
+        protected void OnSuppressCrosswalkSettingsChanged()
+        {
+            MertToolState.SuppressCrosswalks = Mod.settings?.SuppressCrosswalks ?? false;
+
+            if (!ToolEnabled)
+                return;
+
+            QueuePreviewRebuild();
+        }
+
 
         /// <summary>
         /// Attempts to mutate the runtime stamp with newly generated geometry and cost metadata.

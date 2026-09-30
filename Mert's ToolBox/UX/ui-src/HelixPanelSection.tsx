@@ -1,5 +1,8 @@
 ﻿import React, { useEffect, useState } from "react";
 import { trigger, call, bindValue, useValue } from "cs2/api";
+import mertsToolBoxIcon from "./icons/MertsToolBox.svg";
+import standardAnarchyIcon from "./icons/StandardAnarchy.svg";
+import coloredAnarchyIcon from "./icons/ColoredAnarchy.svg";
 import directionIcon from "./icons/Direction.svg";
 import ccwIcon from "./icons/CounterCW.svg";
 import crossWalkIcon from "./icons/CrossWalk.svg";
@@ -11,6 +14,9 @@ import { MertListBox } from './utils/MertListBox';
 // --- GLOBAL BINDINGS (C# TO UI) ---
 const activeToolMode$ = bindValue<string>("MertsToolBox", "ActiveTool", "None|None");
 const toolBoxVisible$ = bindValue<boolean>("MertsToolBox", "IsToolBoxAllowed");
+
+const helixAnarchyInstalled$ = bindValue<boolean>("MertsToolBox", "HelixAnarchyInstalled", false);
+const helixBuildMode$ = bindValue<number>("MertsToolBox", "HelixBuildMode", 0);
 
 const helixDiameter$ = bindValue<number>("MertsToolBox", "HelixDiameter");
 const helixDiameterStepValue$ = bindValue<number>("MertsToolBox", "HelixDiameterStepValue");
@@ -66,6 +72,11 @@ export const HelixPanelSection = () => {
         };
     }, [rawShow]);
 
+    const anarchyInstalled = useValue(helixAnarchyInstalled$) as boolean;
+    const buildMode = useValue(helixBuildMode$) as number;
+    const anarchySelected = anarchyInstalled && buildMode === 1;
+    const toolboxSelected = !anarchySelected;
+
     // --- DATA BINDING EVALUATION ---
     const diameter = useValue(helixDiameter$) as number;
     const diameterStepValue = useValue(helixDiameterStepValue$) as number;
@@ -113,24 +124,43 @@ export const HelixPanelSection = () => {
 
     return (
         <div
-            className={`helix-panel-container`}
+            className={`grid-panel-container`}
             onMouseDown={(e) => { e.stopPropagation(); }}
             onContextMenu={(e) => { e.stopPropagation(); }}
-            style={{ display: "flex", flexDirection: "column" }}>
+            style={{ display: "flex", flexDirection: "column" }}
+        >
             <div className={'panel-header'} style={{
                 fontSize: "1.1em",
                 fontWeight: 600,
-                padding: "2rem 2rem",
-                display: "flex",
-                alignItems: "center",
-                gap: "8rem",
-                whiteSpace: "nowrap"
-            }}>
-                {activeTool.name}
-                <span style={{ color: "yellow", fontSize: "1em" }}>
-                    (REQUIRES ANARCHY)
-                </span>
-            </div>
+                padding: "2rem 10rem"
+            }}>{activeTool.name}</div>
+
+            {/* BUILDING MODE OPTIONS ROW */}
+            <VanillaResolver.instance.Section title="Building Mode">
+                <VanillaResolver.instance.ToolButton
+                    src={anarchySelected ? coloredAnarchyIcon : standardAnarchyIcon}
+                    selected={anarchySelected}
+                    disabled={!anarchyInstalled}
+                    tooltip={
+                        !anarchyInstalled
+                            ? "Requires Anarchy installation."
+                            : (anarchySelected ? "Anarchy is enabled." : "Anarchy is disabled.")
+                    }
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    onSelect={() => trigger("MertsToolBox", "HelixSetBuildMode", 1)}
+                />
+                <VanillaResolver.instance.ToolButton
+                    src={mertsToolBoxIcon}
+                    selected={toolboxSelected}
+                    tooltip={
+                        toolboxSelected
+                            ? "Using Mert's ToolBox (EXPERIMENTAL. Anarchy is recommended.)"
+                            : "Mert's ToolBox is disabled (Enabling is NOT RECOMMENDED.)"
+                    }
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    onSelect={() => trigger("MertsToolBox", "HelixSetBuildMode", 0)}
+                />
+            </VanillaResolver.instance.Section>
 
             {/* DIAMETER ROW */}
             <VanillaResolver.instance.Section title="Diameter">

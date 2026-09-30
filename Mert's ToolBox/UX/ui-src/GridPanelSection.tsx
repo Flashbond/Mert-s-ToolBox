@@ -3,6 +3,7 @@ import { trigger, call, bindValue, useValue } from "cs2/api";
 import crossWalkIcon from "./icons/CrossWalk.svg";
 import alternatingIcon from "./icons/Alternating.svg";
 import orientationIcon from "./icons/Orientation.svg";
+import trafficLightIcon from "./icons/TrafficLight.svg";
 import flattenIcon from "./icons/Flatten.svg";
 import { formatMeters, formatUnits, formatSmart } from "./utils/Formatters";
 import { VanillaResolver } from "./utils/VanilliaResolver";
@@ -22,7 +23,7 @@ const gridAlternating$ = bindValue<boolean>("MertsToolBox", "GridAlternating");
 const gridOrientationLeftBottom$ = bindValue<boolean>("MertsToolBox", "GridOrientationLeftBottom");
 
 const suppressCrosswalks$ = bindValue<boolean>("MertsToolBox", "SuppressCrosswalks", false);
-
+const suppressTrafficLights$ = bindValue<boolean>("MertsToolBox", "SuppressTrafficLights", false);
 const elevationValue$ = bindValue<number>("MertsToolBox", "ElevationValue");
 const elevationStepValue$ = bindValue<number>("MertsToolBox", "ElevationStepValue");
 const elevationStepArray$ = bindValue<number[]>("MertsToolBox", "ElevationStepArray");
@@ -76,7 +77,7 @@ export const GridPanelSection = () => {
     const isOneWaySupported = useValue(gridIsOneWaySupported$) as boolean;
 
     const suppressCrosswalks = useValue(suppressCrosswalks$) as boolean;
-
+    const suppressTrafficLights = useValue(suppressTrafficLights$) as boolean;
     const elevationValue = useValue(elevationValue$) as number;
     const elevationStepValue = useValue(elevationStepValue$) as number;
     const elevationStepValues = useValue(elevationStepArray$) as number[];
@@ -224,13 +225,20 @@ export const GridPanelSection = () => {
                 />
             </VanillaResolver.instance.Section>
 
-            <VanillaResolver.instance.Section title="Remove Crosswalks">
+            <VanillaResolver.instance.Section title="Remove Traffic Signs">
                 <VanillaResolver.instance.ToolButton
                     src={crossWalkIcon}
                     selected={suppressCrosswalks}
                     tooltip={suppressCrosswalks ? "Crosswalks are removed" : "Crosswalks are allowed"}
                     focusKey={VanillaResolver.instance.FOCUS_DISABLED}
                     onSelect={() => trigger("MertsToolBox", "ToggleSuppressCrosswalks")}
+                />
+                <VanillaResolver.instance.ToolButton
+                    src={trafficLightIcon}
+                    selected={suppressTrafficLights}
+                    tooltip={suppressTrafficLights ? "Traffic Lights are removed" : "Traffic Lights are allowed"}
+                    focusKey={VanillaResolver.instance.FOCUS_DISABLED}
+                    onSelect={() => trigger("MertsToolBox", "ToggleSuppressTrafficLights")}
                 />
             </VanillaResolver.instance.Section>
 

@@ -42,6 +42,7 @@ namespace MertsToolBox.Settings
         public const string RedoToolParameter = "RedoToolParameter";
 
         private bool m_SuppressCrosswalks = false;
+        private bool m_SuppressTrafficLights = false;
 
         private int m_DefaultShapeDimension = 96;
         private bool m_UseCtrlWheelForShapeDimensionAdjustment = false;
@@ -63,6 +64,7 @@ namespace MertsToolBox.Settings
 
         public event Action<int, int> OnToolParametersChanged;
         public event Action OnSuppressCrosswalkChanged;
+        public event Action OnSuppressTrafficLightsChanged;
         public ToolBoxSettings(IMod mod) : base(mod)
         {
             SetDefaults();
@@ -106,7 +108,17 @@ namespace MertsToolBox.Settings
                 OnSuppressCrosswalkChanged?.Invoke();
             }
         }
+        public bool SuppressTrafficLights
+        {
+            get => m_SuppressTrafficLights;
+            set
+            {
+                if (m_SuppressTrafficLights == value) return;
 
+                m_SuppressTrafficLights = value;
+                OnSuppressTrafficLightsChanged?.Invoke();
+            }
+        }
         // -------------------------
         // Shape
         // -------------------------
@@ -322,6 +334,7 @@ namespace MertsToolBox.Settings
         public override void SetDefaults()
         {
             m_SuppressCrosswalks = false;
+            m_SuppressTrafficLights = false;
 
             m_DefaultShapeDimension = 96;
             m_UseCtrlWheelForShapeDimensionAdjustment = false;

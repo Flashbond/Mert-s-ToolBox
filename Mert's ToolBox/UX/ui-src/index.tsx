@@ -1,4 +1,4 @@
-﻿import { ModRegistrar } from "cs2/modding";
+import { ModRegistrar } from "cs2/modding";
 import React, { useEffect, useLayoutEffect, useRef } from "react";
 import { trigger, bindValue, useValue } from "cs2/api";
 
@@ -91,12 +91,6 @@ const ToolBoxModeRow = () => {
     );
 };
 
-const KEEP_ROW_MATCHERS: ((row: HTMLElement) => boolean)[] = [
-    (row) => /anarchy/i.test(row.textContent ?? ""),
-    (row) => Array.from(row.querySelectorAll("img")).some(
-        (img) => /anarchy/i.test(img.getAttribute("src") ?? "")),
-];
-
 function findRowContainer(host: HTMLElement): HTMLElement | null {
     let el: HTMLElement | null = host;
     while (el && el.children.length === 1)
@@ -104,16 +98,21 @@ function findRowContainer(host: HTMLElement): HTMLElement | null {
     return el;
 }
 
-function filterVanillaRows(host: HTMLElement) {
-    const container = findRowContainer(host);
-    if (!container) return;
+function hideForeignRows(wrapper: HTMLElement, host: HTMLElement, root: HTMLElement) {
+    const rows: HTMLElement[] = [];
 
-    Array.from(container.children).forEach((child) => {
-        const row = child as HTMLElement;
-        const keep = KEEP_ROW_MATCHERS.some((m) => m(row));
-        const display = keep ? "" : "none";
-        if (row.style.display !== display)
-            row.style.display = display;
+    const container = findRowContainer(host);
+    if (container)
+        Array.from(container.children).forEach((child) => rows.push(child as HTMLElement));
+
+    Array.from(wrapper.children).forEach((child) => {
+        if (child !== host && child !== root)
+            rows.push(child as HTMLElement);
+    });
+
+    rows.forEach((row) => {
+        if (row.style.display !== "none")
+            row.style.display = "none";
     });
 }
 
@@ -127,26 +126,32 @@ const register: ModRegistrar = (moduleRegistry) => {
             const isAllowed = useValue(isToolBoxAllowed$) as boolean;
             const activeTool = parseActiveTool(useValue(activeToolMode$) as string);
             const isActive = isAllowed && activeTool.id !== "None";
+            const wrapperRef = useRef<HTMLDivElement>(null);
             const hostRef = useRef<HTMLDivElement>(null);
+            const rootRef = useRef<HTMLDivElement>(null);
 
             useEffect(() => { preloadAllToolIcons(); }, []);
 
-            // Vanilla/diğer mod satırlarını gizle, sadece izin verilenleri bırak.
             useLayoutEffect(() => {
+                const wrapper = wrapperRef.current;
                 const host = hostRef.current;
-                if (!isActive || !host) return;
+                const root = rootRef.current;
+                if (!isActive || !wrapper || !host || !root) return;
 
-                filterVanillaRows(host);
+                const run = () => hideForeignRows(wrapper, host, root);
+                run();
 
-                // İçerideki bileşenler yeniden çizildikçe (yeni satır eklenince) filtreyi tekrar uygula.
                 if (typeof MutationObserver !== "undefined") {
-                    const observer = new MutationObserver(() => filterVanillaRows(host));
-                    observer.observe(host, { childList: true, subtree: true });
+                    const observer = new MutationObserver((records) => {
+                        if (records.some((r) => !root.contains(r.target as Node)))
+                            run();
+                    });
+                    observer.observe(wrapper, { childList: true, subtree: true });
                     return () => observer.disconnect();
                 }
 
                 let frame = 0;
-                const tick = () => { filterVanillaRows(host); frame = requestAnimationFrame(tick); };
+                const tick = () => { run(); frame = requestAnimationFrame(tick); };
                 frame = requestAnimationFrame(tick);
                 return () => cancelAnimationFrame(frame);
             }, [isActive, activeTool.id]);
@@ -161,12 +166,17 @@ const register: ModRegistrar = (moduleRegistry) => {
             }
 
             return (
-                <>
+                <div
+                    ref={wrapperRef}
+                    className="merts-tool-options-wrapper"
+                    style={{ width: "100%", display: "flex", flexDirection: "column" }}
+                >
                     <div ref={hostRef} className="merts-vanilla-host">
                         <OriginalMouseToolOptions {...props} />
                     </div>
 
                     <div
+                        ref={rootRef}
                         className="merts-toolbox-root"
                         style={{ width: "100%", display: "flex", flexDirection: "column", pointerEvents: "auto" }}
                     >
@@ -176,7 +186,7 @@ const register: ModRegistrar = (moduleRegistry) => {
                         <SoftBlockPanelSection />
                         <GridPanelSection />
                     </div>
-                </>
+                </div>
             );
         };
     });

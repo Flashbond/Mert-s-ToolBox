@@ -3,6 +3,7 @@ using Game.Prefabs;
 using Game.UI.InGame;
 using MertsToolBox.Core;
 using MertsToolBox.Management;
+using MertsToolBox.Systems.SubSystems;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -245,9 +246,10 @@ namespace MertsToolBox
 
             if (applyAction != null && applyAction.WasPerformedThisFrame())
             {
-                if (m_ToolRaycastSystem != null &&
-                    m_ToolRaycastSystem.GetRaycastResult(out _))
+                if (m_ToolRaycastSystem != null &&  m_ToolRaycastSystem.GetRaycastResult(out _))
                 {
+                    MertPlacementGhostSuppressSystem.RequestOnce();
+                    Systems.MertTrafficLightSuppressSystem.MarkNodesForPlacement();
                     RequestDisable(ToolExitMode.RestoreFromPlacement);
                 }
             }

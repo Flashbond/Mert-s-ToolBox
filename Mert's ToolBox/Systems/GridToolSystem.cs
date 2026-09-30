@@ -35,6 +35,10 @@ namespace MertsToolBox.Systems
         /// Indicates whether this tool requires snap enforcement.
         /// </summary>
         protected override bool RequiresSnapEnforcement => true;
+        /// <summary>
+        /// Indicates whether this tool requires traffic lights suppression.
+        /// </summary>
+        protected override bool SupportsTrafficLightSuppression => true;
         #endregion
 
         #region Preset System

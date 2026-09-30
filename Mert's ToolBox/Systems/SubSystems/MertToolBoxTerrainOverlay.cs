@@ -10,7 +10,7 @@ using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace MertsToolBox.Systems
+namespace MertsToolBox.Systems.SubSystems
 {
     internal sealed class TerrainLaneOverlay
     {
@@ -20,8 +20,9 @@ namespace MertsToolBox.Systems
         private readonly TerrainSystem m_Terrain;
         private readonly FieldInfo m_LaneListField;
         private readonly FieldInfo m_CascadeCullingField;
+        private readonly FieldInfo m_UpdateAreaField;
         private readonly List<FieldInfo> m_JobFields = new();
-        private readonly Dictionary<Type, List<FieldInfo>> m_CascadeJobFields = new();
+        private readonly List<FieldInfo> m_CascadeJobFields = new();
 
         private readonly List<TerrainSystem.LaneSection> m_Lanes = new();
         private float4 m_Area;
@@ -37,20 +38,76 @@ namespace MertsToolBox.Systems
         public int FramesSinceInject { get; private set; }
         public float4 Area => m_Area;
 
-        /// <summary>Resolves the TerrainSystem lane list and job handles via reflection.</summary>
+        /// <summary>
+        /// Resolves the TerrainSystem lane list and every job handle that reads it via reflection.
+        /// The per-cascade culling jobs (CullRoadsCascadeJob) iterate the lane list with a length read when they START,
+        /// but their output list was sized from the length read when they were SCHEDULED. If the overlay grows the lane
+        /// list in between, the job writes past the end of its output buffer (native heap corruption, later crash).
+        /// So the overlay may only touch the list after completing those jobs; if their handles cannot be found, the
+        /// overlay stays disabled (Ok = false) instead of guessing.
+        /// </summary>
         public TerrainLaneOverlay(TerrainSystem terrain)
         {
             m_Terrain = terrain;
             Type ts = typeof(TerrainSystem);
             m_LaneListField = ts.GetField("m_LaneCullList", k_Flags);
-            m_CascadeCullingField = ts.GetField("m_CascadeCulling", k_Flags);
+            // TerrainSystem.OnAreaChanged does two things: it queues a cascade redraw (m_UpdateArea) AND tells
+            // GroundHeightSystem that the ground changed there, which re-snaps every object and net in the area -
+            // including the tool's own preview roads, which the game then rebuilds (flicker, lost "will be removed"
+            // outlines). The overlay is only a visual preview, so it asks for the redraw alone.
+            m_UpdateAreaField = ts.GetField("m_UpdateArea", k_Flags);
+            if (m_UpdateAreaField != null && m_UpdateAreaField.FieldType != typeof(float4))
+                m_UpdateAreaField = null;
             foreach (FieldInfo f in ts.GetFields(k_Flags))
             {
                 if (f.FieldType == typeof(JobHandle))
                     m_JobFields.Add(f);
             }
 
-            Ok = m_LaneListField != null && m_LaneListField.FieldType == typeof(NativeList<TerrainSystem.LaneSection>);
+            m_CascadeCullingField = FindCascadeCulling(ts, m_CascadeJobFields);
+
+            bool laneList = m_LaneListField != null && m_LaneListField.FieldType == typeof(NativeList<TerrainSystem.LaneSection>);
+            Ok = laneList && m_CascadeCullingField != null && m_CascadeJobFields.Count > 0;
+        }
+
+        /// <summary>
+        /// Finds the TerrainSystem field holding the per-cascade culling state: an array or list whose element type has a
+        /// JobHandle field named m_LaneHandle (the handle of the cascade's lane culling jobs). Collects every JobHandle
+        /// field of that element type.
+        /// </summary>
+        private static FieldInfo FindCascadeCulling(Type ts, List<FieldInfo> handles)
+        {
+            foreach (FieldInfo f in ts.GetFields(k_Flags))
+            {
+                Type ft = f.FieldType;
+                Type element = ft.IsArray ? ft.GetElementType()
+                    : ft.IsGenericType && typeof(IList).IsAssignableFrom(ft) ? ft.GetGenericArguments()[0]
+                    : null;
+                if (element == null)
+                    continue;
+
+                FieldInfo lane = element.GetField("m_LaneHandle", k_Flags);
+                if (lane == null || lane.FieldType != typeof(JobHandle))
+                    continue;
+
+                handles.Clear();
+                foreach (FieldInfo ef in element.GetFields(k_Flags))
+                {
+                    if (ef.FieldType == typeof(JobHandle))
+                        handles.Add(ef);
+                }
+                return f;
+            }
+            return null;
+        }
+
+        /// <summary>Comma-separated field names for the startup log.</summary>
+        private static string Names(List<FieldInfo> fields)
+        {
+            var names = new List<string>(fields.Count);
+            foreach (FieldInfo f in fields)
+                names.Add(f.Name);
+            return string.Join(",", names);
         }
 
         /// <summary>Replaces the overlay with the given lanes and redraws the old and new areas.</summary>
@@ -115,7 +172,7 @@ namespace MertsToolBox.Systems
         public void Tick()
         {
             if (m_RefreshCountdown > 0 && --m_RefreshCountdown == 0)
-                m_Terrain.OnAreaChanged(m_RefreshArea);
+                RequestRedraw(m_RefreshArea);
         }
 
         /// <summary>
@@ -124,9 +181,28 @@ namespace MertsToolBox.Systems
         /// </summary>
         private void MarkDirty(float4 area)
         {
-            m_Terrain.OnAreaChanged(area);
+            RequestRedraw(area);
             m_RefreshArea = m_RefreshCountdown > 0 ? Union(m_RefreshArea, area) : area;
             m_RefreshCountdown = k_SplatRefreshDelay;
+        }
+
+        /// <summary>
+        /// Redraws the terrain cascades over the area without notifying GroundHeightSystem (render only). Falls back to
+        /// the full OnAreaChanged if a game update renamed the field.
+        /// </summary>
+        private void RequestRedraw(float4 area)
+        {
+            if (m_UpdateAreaField == null)
+            {
+                m_Terrain.OnAreaChanged(area);
+                return;
+            }
+
+            float4 current = (float4)m_UpdateAreaField.GetValue(m_Terrain);
+            current = math.lengthsq(current) > 0f
+                ? new float4(math.min(current.xy, area.xy), math.max(current.zw, area.zw))
+                : area;
+            m_UpdateAreaField.SetValue(m_Terrain, current);
         }
 
         /// <summary>Returns a view of TerrainSystem's lane list sharing the same native memory.</summary>
@@ -174,32 +250,23 @@ namespace MertsToolBox.Systems
             m_Count = 0;
         }
 
-        /// <summary>Completes TerrainSystem culling jobs before the lane list is touched on the main thread.</summary>
+        /// <summary>
+        /// Completes every TerrainSystem job that reads or writes the lane list, including each cascade's lane culling
+        /// jobs, before the list is touched on the main thread.
+        /// </summary>
         private void CompleteJobs()
         {
             foreach (FieldInfo f in m_JobFields)
                 ((JobHandle)f.GetValue(m_Terrain)).Complete();
 
-            if (m_CascadeCullingField?.GetValue(m_Terrain) is IList cascades)
+            // Null before the first cull: no cascade job has been scheduled yet.
+            if (m_CascadeCullingField.GetValue(m_Terrain) is IList cascades)
             {
                 foreach (object info in cascades)
                 {
                     if (info == null)
                         continue;
-
-                    Type t = info.GetType();
-                    if (!m_CascadeJobFields.TryGetValue(t, out List<FieldInfo> fields))
-                    {
-                        fields = new List<FieldInfo>();
-                        foreach (FieldInfo f in t.GetFields(k_Flags))
-                        {
-                            if (f.FieldType == typeof(JobHandle))
-                                fields.Add(f);
-                        }
-                        m_CascadeJobFields[t] = fields;
-                    }
-
-                    foreach (FieldInfo f in fields)
+                    foreach (FieldInfo f in m_CascadeJobFields)
                         ((JobHandle)f.GetValue(info)).Complete();
                 }
             }

@@ -5,8 +5,8 @@
 
 		<!--The file where mod information which is required for publishing mod on PDX mods are stored-->
 		<PublishConfigurationPath>Properties\PublishConfiguration.xml</PublishConfigurationPath>
-		<AssemblyVersion>1.0.3</AssemblyVersion>
-		<FileVersion>1.0.3</FileVersion>
+		<AssemblyVersion>1.0.5</AssemblyVersion>
+		<FileVersion>1.0.5</FileVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -38,13 +38,19 @@
 	  <UpToDateCheckInput Remove="ui-dist\**" />
 	</ItemGroup>
 	<ItemGroup>
-	  <Compile Remove="Systems\HelixErrorColorOverrideSystem.cs" />
-	  <Compile Remove="Systems\HelixToolErrorOverrideSystem.cs" />
+	  <Compile Remove="Systems\SubSystems\MertFlattenChurnDiagSystem.cs" />
+	  <Compile Remove="Systems\SubSystems\MertFlattenJitterDiag.cs" />
+	  <Compile Remove="Systems\SubSystems\MertNetIntegrityDiagSystem.cs" />
+	  <Compile Remove="Systems\SubSystems\MertStampPrefabCompareDiag.cs" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<Reference Include="0Harmony">
 			<HintPath>Management\Patches\0Harmony.dll</HintPath>
+		</Reference>
+		<Reference Include="Colossal.AssetPipeline">
+		  <HintPath>D:\Cities Skylines II\Cities2_Data\Managed\Colossal.AssetPipeline.dll</HintPath>
+		  <Private>False</Private>
 		</Reference>
 		<Reference Include="Colossal.Collections">
 		  <HintPath>D:\Cities Skylines II\Cities2_Data\Managed\Colossal.Collections.dll</HintPath>

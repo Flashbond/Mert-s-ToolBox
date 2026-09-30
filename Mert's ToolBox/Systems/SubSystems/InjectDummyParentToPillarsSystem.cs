@@ -3,7 +3,7 @@ using Game.Tools;
 using MertsToolBox.Management;
 using Unity.Entities;
 
-namespace MertsToolBox.Systems
+namespace MertsToolBox.Systems.SubSystems
 {
     public partial class InjectDummyParentToPillarsSystem : SystemBase
     {

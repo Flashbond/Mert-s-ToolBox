@@ -63,6 +63,9 @@ namespace MertsToolBox.Settings
                 { m_Settings.GetOptionLabelLocaleID(nameof(ToolBoxSettings.SuppressCrosswalks)), "Remove Crosswalks (Zebra Crossing for British :)" },
                 { m_Settings.GetOptionDescLocaleID(nameof(ToolBoxSettings.SuppressCrosswalks)), "Sets crosswalks (zebra crossings) removal as the default behavior on shape placement." },
 
+                 { m_Settings.GetOptionLabelLocaleID(nameof(ToolBoxSettings.SuppressTrafficLights)), "Remove Traffic Lights" },
+                { m_Settings.GetOptionDescLocaleID(nameof(ToolBoxSettings.SuppressTrafficLights)), "Sets traffic lights removal as the default behavior on shape placement." },
+
                 // -------------------------
                 // Shape
                 // -------------------------

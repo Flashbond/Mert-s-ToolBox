@@ -32,6 +32,7 @@ namespace MertsToolBox.Management
         public static bool HelixCleanupRequested { get; set; } = false;
         public static bool ActiveHelixUsesPierLikePrefab;
         public static bool SuppressCrosswalks { get; set; }
+        public static bool SuppressTrafficLights { get; set; }
         public static float ActiveHelixBaseElevation = 0f;
         public static float ActiveHelixClearance =0f;
         #endregion
@@ -43,6 +44,10 @@ namespace MertsToolBox.Management
         public static bool FlattenBusy { get; set; }
 
         public static bool FlattenToolActive => FlattenOwner != null;
+        #endregion
+        #region Traffic Lights
+        public static MertBaseToolSystem TrafficLightOwner { get; set; }
+        public static bool TrafficLightToolActive => TrafficLightOwner != null;
         #endregion
         #region Sanp States
         public static bool SnapGeometryEnabled = true;

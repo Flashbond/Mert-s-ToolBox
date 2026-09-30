@@ -1,6 +1,6 @@
 ﻿using Unity.Mathematics;
 
-namespace MertsToolBox.Systems
+namespace MertsToolBox.Utilities
 {
     public readonly struct ShapeMetrics
     {

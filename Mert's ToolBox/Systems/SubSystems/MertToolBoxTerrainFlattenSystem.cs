@@ -7,10 +7,12 @@ using Game.SceneFlow;
 using Game.Simulation;
 using Game.Tools;
 using MertsToolBox.Management;
+using MertsToolBox.Systems.SubSystems;
 using System;
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
 using Color = UnityEngine.Color;
@@ -41,17 +43,35 @@ namespace MertsToolBox.Systems
         private const int k_PreviewGraceFrames = 15;
         private const float k_RaycastSearch = 250f;
         private const float k_TerrainHitTolerance = 0.75f;
+        private const float k_WaterFreeboard = 1f;       // flat ground never ends up closer than this above water
+        private const float k_MaxWaterDepth = 200f;      // sanity limit for a sampled water depth
+        private const int k_TargetLogMax = 300;          // DEBUG: [FLATTEN-TARGET] line limit per session
+
+        // "Parting the sea": while the stamp moves, the flattened footprint is grown so the ground ahead of it is
+        // already flat (and already in the game's CPU height copy) when the stamp arrives. Once it has been still for
+        // a few frames the footprint shrinks back to the stamp's real size.
+        private const float k_ExpandFactor = 0.25f;      // extra margin per side = 25% of the stamp extent (~x1.5)
+        private const float k_ExpandMin = 8f;
+        private const float k_ExpandMax = 40f;
+        private const int k_ShrinkAfterStillFrames = 8;
+        private const float k_MouseRayTolerance = 3f;
 
         private ToolSystem m_ToolSystem;
         private ObjectToolSystem m_ObjectToolSystem;
         private PrefabSystem m_PrefabSystem;
         private TerrainSystem m_TerrainSystem;
+        private WaterSystem m_WaterSystem;
         private Game.Rendering.CameraUpdateSystem m_CameraUpdateSystem;
 
         internal static MertToolBoxTerrainFlattenSystem Instance { get; private set; }
 
+        private static readonly System.Reflection.FieldInfo s_ObjectToolForceUpdate =
+            typeof(ObjectToolSystem).GetField("m_ForceUpdate", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
         private EntityQuery m_TempNodeQuery;
         private EntityQuery m_TempEdgeQuery;
+        private EntityQuery m_CourseDefinitionQuery;
+        private readonly HashSet<int2> m_TmpNodeKeys = new();
 
         private Texture2D m_MaskTexture;
 
@@ -79,11 +99,19 @@ namespace MertsToolBox.Systems
         private BaseHeightCache m_Base;
         private bool m_PreviewValid;
         private float m_PreviewTarget;
+        private float m_LastLoggedTarget = -1e9f;
+        private int m_TargetLogLines;
         private float m_PreviewMaxWidth;
         private readonly List<float2> m_PreviewHull = new();
         private float2 m_SigCentroid;
         private float2 m_SigMin;
         private float2 m_SigMax;
+        private float2 m_SeenCentroid;
+        private float2 m_SeenMin;
+        private float2 m_SeenMax;
+        private int m_StillFrames;
+        private bool m_BuiltExpanded;
+        private float m_BuiltExpand;
         private int m_FramesSinceBuild;
         private int m_MissingFrames;
         private readonly List<float2> m_TmpCenters = new();
@@ -99,12 +127,20 @@ namespace MertsToolBox.Systems
             m_ObjectToolSystem = World.GetOrCreateSystemManaged<ObjectToolSystem>();
             m_PrefabSystem = World.GetOrCreateSystemManaged<PrefabSystem>();
             m_TerrainSystem = World.GetOrCreateSystemManaged<TerrainSystem>();
+            m_WaterSystem = World.GetOrCreateSystemManaged<WaterSystem>();
             m_CameraUpdateSystem = World.GetOrCreateSystemManaged<Game.Rendering.CameraUpdateSystem>();
 
             m_TempNodeQuery = GetEntityQuery(
                 ComponentType.ReadOnly<Temp>(),
                 ComponentType.ReadOnly<GameNetNode>(),
                 ComponentType.ReadOnly<PrefabRef>(),
+                ComponentType.Exclude<Deleted>());
+
+            // The object tool's net definitions for the stamp's sub-roads: the footprint is known as soon as the tool
+            // writes them, without waiting for the game to generate the temp preview roads from them.
+            m_CourseDefinitionQuery = GetEntityQuery(
+                ComponentType.ReadOnly<CreationDefinition>(),
+                ComponentType.ReadOnly<NetCourse>(),
                 ComponentType.Exclude<Deleted>());
 
             m_TempEdgeQuery = GetEntityQuery(
@@ -167,8 +203,12 @@ namespace MertsToolBox.Systems
             bool applying = stampActive && m_ObjectToolSystem.applyMode == ApplyMode.Apply;
 
             bool holding = m_Pending.Exists(b => b.UsesOverlay && !b.Baked);
-            if (!holding)
-                UpdatePreview(applying);
+            // The regular preview is rebuilt late in the frame (LatePreviewUpdate) from this frame's definitions.
+            // Only the commit frame rebuilds here, unthrottled, so the captured batch matches what is being built.
+            if (!holding && applying)
+                UpdatePreview(true);
+            else if (!holding && m_PreviewValid && !IsFlattenStampPreview(out _))
+                StopPreview();   // the tool closed or switched away: the late pass no longer runs, remove the preview here
             m_Overlay.KeepAlive();
 
             if (applying && TryCaptureBatch(m_PrefabSystem.GetEntity(MertBaseToolSystem.SharedRuntimeStamp), out PendingBatch batch))
@@ -185,6 +225,58 @@ namespace MertsToolBox.Systems
             }
 
             PublishBusyState();
+        }
+
+        /// <summary>
+        /// Called by MertFlattenLatePreviewSystem at the end of the modification phases: the object tool's definitions
+        /// of THIS frame are there, and the overlay injected now is drawn in this same frame.
+        /// </summary>
+        internal void LatePreviewUpdate()
+        {
+            if (!MertToolState.FlattenToolActive || !MertToolState.FlattenGeometryEnabled || !m_Overlay.Ok)
+                return;
+
+            if (m_Pending.Exists(b => b.UsesOverlay && !b.Baked))
+                return;
+
+            UpdatePreview(false);
+            PublishBusyState();
+        }
+
+        /// <summary>
+        /// Asks the object tool to rebuild its preview on its next update (same as its own m_ForceUpdate). Used when the
+        /// flat road height changed while the tool's definitions stayed the same (e.g. the footprint shrank back after a
+        /// move): MertFlattenCourseSystem then flattens the fresh definitions to the new height.
+        /// </summary>
+        private void ForceObjectToolRefresh()
+        {
+            try
+            {
+                if (s_ObjectToolForceUpdate != null && s_ObjectToolForceUpdate.FieldType == typeof(bool))
+                    s_ObjectToolForceUpdate.SetValue(m_ObjectToolSystem, true);
+            }
+            catch
+            {
+            }
+        }
+
+        /// <summary>
+        /// Height the stamp's roads must have while the flatten preview is shown: the overlay's flat ground plus the
+        /// tool elevation - the same value the commit uses (batch.RoadY). False when no flatten preview is active.
+        /// </summary>
+        internal bool TryGetPreviewRoadHeight(out float roadY, out float elevation, out HashSet<Entity> roadPrefabs)
+        {
+            roadY = 0f;
+            elevation = MertBaseToolSystem.LastHandoffElevation;
+            roadPrefabs = null;
+
+            if (!m_PreviewValid || !m_Overlay.Active || !IsFlattenStampPreview(out AssetStampPrefab stamp))
+                return false;
+            if (!GetStampRoadPrefabs(m_PrefabSystem.GetEntity(stamp), out roadPrefabs, out _))
+                return false;
+
+            roadY = m_PreviewTarget + elevation;
+            return true;
         }
 
         /// <summary>Drops every state tied to the previous map.</summary>
@@ -234,13 +326,23 @@ namespace MertsToolBox.Systems
             if (!heightData.isCreated || math.abs(TerrainUtils.SampleHeight(ref heightData, p) - p.y) > k_TerrainHitTolerance)
                 return false;
 
-            float3 origin = m_CameraUpdateSystem.position;
-            float3 toHit = p - origin;
-            float dist = math.length(toHit);
+            // Walk the CURRENT mouse ray, not the direction towards the game's hit point: the game's terrain hit is
+            // only approximately on the ray and moves a little every time the overlay is rebuilt, which made the
+            // corrected point settle ~0.7 m away after each move (visible as the stamp twitching). The mouse ray does
+            // not depend on the overlay at all, so a still mouse always gives the same stamp position.
+            if (!TryGetMouseRay(p, out float3 origin, out float3 dir))
+            {
+                origin = m_CameraUpdateSystem.position;
+                float3 toHitFallback = p - origin;
+                float lenFallback = math.length(toHitFallback);
+                if (lenFallback < 1f)
+                    return false;
+                dir = toHitFallback / lenFallback;
+            }
+
+            float dist = math.dot(p - origin, dir);
             if (dist < 1f)
                 return false;
-
-            float3 dir = toHit / dist;
             float step = math.max(1f, m_Base.TexelSize * 0.5f);
             float t0 = math.max(0f, dist - k_RaycastSearch);
             float t1 = dist + k_RaycastSearch;
@@ -285,6 +387,32 @@ namespace MertsToolBox.Systems
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// The camera ray under the mouse cursor. Returns false (caller falls back to the hit direction) when there is no
+        /// camera or mouse, or when the ray passes too far from the game's hit (e.g. the camera moved since the raycast).
+        /// </summary>
+        private static bool TryGetMouseRay(float3 hitPoint, out float3 origin, out float3 dir)
+        {
+            origin = default;
+            dir = default;
+
+            Camera cam = Camera.main;
+            UnityEngine.InputSystem.Mouse mouse = UnityEngine.InputSystem.Mouse.current;
+            if (cam == null || mouse == null)
+                return false;
+
+            Ray ray = cam.ScreenPointToRay(mouse.position.ReadValue());
+            origin = ray.origin;
+            dir = math.normalizesafe((float3)ray.direction);
+            if (math.all(dir == float3.zero))
+                return false;
+
+            // Sanity check: the game's hit should lie close to this ray.
+            float3 toHit = hitPoint - origin;
+            float along = math.dot(toHit, dir);
+            return along > 1f && math.length(toHit - dir * along) < k_MouseRayTolerance;
         }
 
         /// <summary>Returns the height of the ray point at distance t above the cached original terrain.</summary>
@@ -347,27 +475,7 @@ namespace MertsToolBox.Systems
 
             m_TmpCenters.Clear();
             m_TmpNodes.Clear();
-            using (NativeArray<Entity> nodes = m_TempNodeQuery.ToEntityArray(Allocator.Temp))
-            {
-                foreach (Entity e in nodes)
-                {
-                    if (IsNewAndOurs(e, roadPrefabs))
-                        m_TmpNodes.Add(EntityManager.GetComponentData<GameNetNode>(e).m_Position.xz);
-                }
-            }
-
-            using (NativeArray<Entity> edges = m_TempEdgeQuery.ToEntityArray(Allocator.Temp))
-            {
-                foreach (Entity e in edges)
-                {
-                    if (!IsNewAndOurs(e, roadPrefabs))
-                        continue;
-
-                    Bezier4x3 b = EntityManager.GetComponentData<GameNetCurve>(e).m_Bezier;
-                    for (int s = 0; s <= k_PreviewCurveSamples; s++)
-                        m_TmpCenters.Add(MathUtils.Position(b, s / (float)k_PreviewCurveSamples).xz);
-                }
-            }
+            CollectFromDefinitions(roadPrefabs);
 
             if (m_TmpNodes.Count == 0 || m_TmpCenters.Count < 2)
             {
@@ -380,16 +488,41 @@ namespace MertsToolBox.Systems
 
             float2 centroid = FlattenFootprint.Centroid(m_TmpCenters);
             FlattenFootprint.MinMax(m_TmpCenters, out float2 cmin, out float2 cmax);
-            if (m_PreviewValid && m_Overlay.Active
-                && math.distance(centroid, m_SigCentroid) < k_PreviewMoveEpsilon
-                && math.distance(cmin, m_SigMin) < k_PreviewMoveEpsilon
-                && math.distance(cmax, m_SigMax) < k_PreviewMoveEpsilon)
+
+            // Still or moving? Compared with the previous frame (position and, through min/max, rotation).
+            bool moved = math.distance(centroid, m_SeenCentroid) >= k_PreviewMoveEpsilon
+                      || math.distance(cmin, m_SeenMin) >= k_PreviewMoveEpsilon
+                      || math.distance(cmax, m_SeenMax) >= k_PreviewMoveEpsilon;
+            m_SeenCentroid = centroid;
+            m_SeenMin = cmin;
+            m_SeenMax = cmax;
+            m_StillFrames = moved ? 0 : m_StillFrames + 1;
+
+            // The commit always flattens the real footprint; otherwise grow it until the stamp has settled.
+            bool expanded = !commitFrame && m_StillFrames < k_ShrinkAfterStillFrames;
+            float expand = expanded ? math.clamp(k_ExpandFactor * math.cmax(cmax - cmin), k_ExpandMin, k_ExpandMax) : 0f;
+
+            if (m_PreviewValid && m_Overlay.Active && expanded == m_BuiltExpanded)
+            {
+                if (expanded)
+                {
+                    // Keep the grown overlay (and its height) while the stamp stays well inside it.
+                    if (math.distance(centroid, m_SigCentroid) < m_BuiltExpand * 0.5f)
+                        return;
+                }
+                else if (math.distance(centroid, m_SigCentroid) < k_PreviewMoveEpsilon
+                         && math.distance(cmin, m_SigMin) < k_PreviewMoveEpsilon
+                         && math.distance(cmax, m_SigMax) < k_PreviewMoveEpsilon)
+                {
+                    return;
+                }
+            }
+
+            if (!commitFrame && m_PreviewValid && m_Overlay.Active && expanded == m_BuiltExpanded
+                && m_FramesSinceBuild < k_PreviewMinFrames)
                 return;
 
-            if (!commitFrame && m_PreviewValid && m_Overlay.Active && m_FramesSinceBuild < k_PreviewMinFrames)
-                return;
-
-            float radius = halfWidth + k_FlatMargin;
+            float radius = halfWidth + k_FlatMargin + expand;
             float pad = radius + k_MaxFalloff + 40f;
             if (!m_Base.Ensure(cmin - pad, cmax + pad))
             {
@@ -397,10 +530,7 @@ namespace MertsToolBox.Systems
                 return;
             }
 
-            float sum = 0f;
-            foreach (float2 n in m_TmpNodes)
-                sum += m_Base.Sample(n);
-            float target = sum / m_TmpNodes.Count;
+            float target = ComputeTargetHeight();
 
             FlattenFootprint.BuildHull(m_TmpCenters, radius, m_PreviewHull);
             if (m_PreviewHull.Count < 3)
@@ -414,13 +544,151 @@ namespace MertsToolBox.Systems
             FlattenFootprint.MinMax(m_PreviewHull, out float2 hmin, out float2 hmax);
             m_Overlay.Set(m_TmpLanes, new float4(hmin - maxWidth - 10f, hmax + maxWidth + 10f));
 
+            // New flat height (or a new preview): the tool's current definitions were flattened to the old one.
+            if (!commitFrame && (!m_PreviewValid || math.abs(target - m_PreviewTarget) > 0.01f))
+                ForceObjectToolRefresh();
+
             m_PreviewValid = true;
             m_PreviewTarget = target;
             m_PreviewMaxWidth = maxWidth;
             m_SigCentroid = centroid;
             m_SigMin = cmin;
             m_SigMax = cmax;
+            m_BuiltExpanded = expanded;
+            m_BuiltExpand = expand;
             m_FramesSinceBuild = 0;
+        }
+
+        /// <summary>
+        /// Footprint from the object tool's net definitions of the stamp (new courses of our road prefabs). Returns false
+        /// when there are none yet (the preview then waits, see k_PreviewGraceFrames).
+        /// </summary>
+        private bool CollectFromDefinitions(HashSet<Entity> roadPrefabs)
+        {
+            if (m_CourseDefinitionQuery.IsEmptyIgnoreFilter)
+                return false;
+
+            m_TmpNodeKeys.Clear();
+            using (NativeArray<Entity> defs = m_CourseDefinitionQuery.ToEntityArray(Allocator.Temp))
+            {
+                foreach (Entity e in defs)
+                {
+                    CreationDefinition definition = EntityManager.GetComponentData<CreationDefinition>(e);
+                    if (definition.m_Original != Entity.Null || !roadPrefabs.Contains(definition.m_Prefab))
+                        continue;
+
+                    Bezier4x3 b = EntityManager.GetComponentData<NetCourse>(e).m_Curve;
+                    for (int s = 0; s <= k_PreviewCurveSamples; s++)
+                        m_TmpCenters.Add(MathUtils.Position(b, s / (float)k_PreviewCurveSamples).xz);
+
+                    AddNodeOnce(b.a.xz);
+                    AddNodeOnce(b.d.xz);
+                }
+            }
+
+            return m_TmpNodes.Count > 0 && m_TmpCenters.Count >= 2;
+        }
+
+        /// <summary>
+        /// Flat ground height for the current footprint, kept out of the water:
+        ///  - only "dry" nodes (original ground above the water surface there) are averaged, so sea-floor samples at a
+        ///    coast no longer drag the height below the water line,
+        ///  - the result never goes below the highest water surface under the footprint plus a freeboard; otherwise the
+        ///    water simulation floods the lowered ground and, while moving inland, the "sea" follows the stamp,
+        ///  - a footprint entirely in water gets water surface + freeboard (the water is filled in).
+        /// Water surface = max(sea level, ORIGINAL ground + water depth) at each node.
+        /// The surface must not be taken from WaterUtils.SampleHeight directly: that adds the depth to the game's CPU
+        /// height copy, which already contains our own preview overlay. When the overlay lifts the ground, the water
+        /// column standing there is lifted with it for a while, so "overlay height + depth + freeboard" became the next
+        /// target, the overlay rose again, and the stamp climbed without end. The original ground (base heightmap
+        /// cache, never touched by the overlay) plus the depth cannot exceed the real water column, so no feedback.
+        /// The result is finally clamped to the terrain's height range as a last safety.
+        /// </summary>
+        private float ComputeTargetHeight()
+        {
+            float seaLevel = m_WaterSystem.SeaLevel;
+            bool haveWaterData = false;
+            WaterSurfaceData<SurfaceWater> water = default;
+            TerrainHeightData terrain = default;
+            try
+            {
+                water = m_WaterSystem.GetSurfaceData(out JobHandle deps);
+                deps.Complete();
+                terrain = m_TerrainSystem.GetHeightData(false);
+                haveWaterData = terrain.isCreated;
+            }
+            catch
+            {
+                haveWaterData = false;
+            }
+
+            float drySum = 0f;
+            int dryCount = 0;
+            float allSum = 0f;
+            float maxWaterTop = float.MinValue;
+            bool anyWet = false;
+
+            foreach (float2 n in m_TmpNodes)
+            {
+                float ground = m_Base.Sample(n);
+                allSum += ground;
+
+                float waterTop = seaLevel;
+                if (haveWaterData)
+                {
+                    try
+                    {
+                        WaterUtils.SampleHeight(ref water, ref terrain, new float3(n.x, 0f, n.y), out float depth);
+                        if (depth > 0.05f)
+                            waterTop = math.max(waterTop, ground + math.min(depth, k_MaxWaterDepth));
+                    }
+                    catch
+                    {
+                        haveWaterData = false;
+                    }
+                }
+
+                if (ground < waterTop)
+                {
+                    anyWet = true;
+                    maxWaterTop = math.max(maxWaterTop, waterTop);
+                }
+                else
+                {
+                    drySum += ground;
+                    dryCount++;
+                }
+            }
+
+            float target;
+            if (!anyWet)
+            {
+                target = allSum / m_TmpNodes.Count;
+            }
+            else
+            {
+                float floor = maxWaterTop + k_WaterFreeboard;
+                target = math.max(dryCount > 0 ? drySum / dryCount : floor, floor);
+            }
+
+            float minH = m_TerrainSystem.positionOffset.y;
+            float maxH = minH + m_TerrainSystem.heightScaleOffset.x;
+            float clamped = math.isfinite(target) ? math.clamp(target, minH, maxH) : minH;
+
+            // DEBUG while the CTD is open: one line per clearly changed target.
+            if (m_TargetLogLines < k_TargetLogMax && math.abs(clamped - m_LastLoggedTarget) > 0.5f)
+            {
+                m_TargetLogLines++;
+                m_LastLoggedTarget = clamped;
+             }
+            return clamped;
+        }
+
+        /// <summary>Adds a course end point as a node, once per 0.1 m cell (neighbouring courses share their ends).</summary>
+        private void AddNodeOnce(float2 p)
+        {
+            if (m_TmpNodeKeys.Add((int2)math.round(p * 10f)))
+                m_TmpNodes.Add(p);
         }
 
         /// <summary>Collects the stamp's sub-net road prefabs and their largest half width.</summary>
@@ -787,10 +1055,9 @@ namespace MertsToolBox.Systems
             float brushSize = math.cmax(max - min) + 2f * pad;
             float2 origin = center - brushSize * 0.5f;
 
-            float texel = m_Base.TexelSize;
-            int res = texel > 0f
-                ? math.clamp((int)math.ceil(brushSize / (texel * 0.5f)), 64, k_MaskResolution)
-                : k_MaskResolution;
+            // Always the full mask resolution: the mask texture is then created once and never destroyed while the
+            // terrain may still use it for a brush applied earlier.
+            int res = k_MaskResolution;
             float px = brushSize / res;
 
             TerrainHeightData cascade = m_TerrainSystem.GetHeightData(false);
@@ -922,7 +1189,7 @@ namespace MertsToolBox.Systems
                 }
         }
 
-        /// <summary>Returns the reusable mask texture, recreating it when the resolution changes.</summary>
+        /// <summary>Returns the reusable mask texture (every caller uses k_MaskResolution, so it is created once).</summary>
         private Texture2D GetMaskTexture(int res)
         {
             if (m_MaskTexture == null || m_MaskTexture.width != res)
@@ -1032,6 +1299,22 @@ namespace MertsToolBox.Systems
             }
 
             return weight;
+        }
+    }
+
+    /// <summary>
+    /// Runs the flatten preview late in the frame (register at SystemUpdatePhase.ModificationEnd): the object tool's
+    /// definitions of this frame exist by then, and the overlay injected now is drawn in the same frame.
+    /// </summary>
+    public partial class MertFlattenLatePreviewSystem : SystemBase
+    {
+        /// <summary>Does nothing unless a flatten tool is active.</summary>
+        protected override void OnUpdate()
+        {
+            if (!MertToolState.FlattenToolActive || !MertToolState.FlattenGeometryEnabled)
+                return;
+
+            MertToolBoxTerrainFlattenSystem.Instance?.LatePreviewUpdate();
         }
     }
 }
